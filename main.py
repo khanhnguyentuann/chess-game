@@ -66,7 +66,7 @@ while not done:
                     img = pygame.transform.scale(img, (60, 60))
                 else:
                     img = pygame.transform.scale(img, (40, 40))
-                screen.blit(img, (col * 80 + 10, row * 80 + 10))
+                screen.blit(img, (col * 80 + 20, row * 80 + 20))
 
     # Vẽ các ô vuông hỗ trợ chọn quân cờ
     pygame.draw.rect(screen, GREEN, [0, 0, 640, 640], 5)
