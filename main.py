@@ -40,17 +40,28 @@ def get_coord(pos):
     col = x // 80
     return row, col
 
+# Thêm biến để lưu trữ quân cờ được chọn và vị trí của nó
+selected_piece = None
+selected_row, selected_col = None, None
+
 while not done:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             done = True
         elif event.type == pygame.MOUSEBUTTONDOWN:
-            # Lấy tọa độ của ô cờ mà người dùng click vào
             pos = pygame.mouse.get_pos()
             row, col = get_coord(pos)
 
-            # Kiểm tra xem ô cờ đó có quân cờ hay không
-            if board[row][col] != " " and board[row][col] != ".":
+            if selected_piece:
+                # Di chuyển quân cờ đã chọn đến vị trí mới
+                board[row][col] = selected_piece
+                board[selected_row][selected_col] = " " if (selected_row + selected_col) % 2 == 0 else "."
+                selected_piece = None
+                selected_row, selected_col = None, None
+            elif board[row][col] != " " and board[row][col] != ".":
+                # Chọn quân cờ và lưu lại vị trí của nó
+                selected_piece = board[row][col]
+                selected_row, selected_col = row, col
                 print("Đã click vào quân cờ ở hàng", row, "cột", col)
 
     # Vẽ bàn cờ và các quân cờ
