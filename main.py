@@ -1,22 +1,20 @@
 import pygame
 import sys
-import chess  # Cài đặt thư viện python-chess: pip install python-chess
+import chess
 
-# Khởi tạo pygame và đặt cấu hình ban đầu
 pygame.init()
 
-FPS = 30  # Số khung hình mỗi giây
-WINDOW_WIDTH = 512  # Chiều rộng cửa sổ
-WINDOW_HEIGHT = 600  # Chiều cao cửa sổ
-BOARD_SIZE = 8  # Kích thước bàn cờ
+FPS = 30
+WINDOW_WIDTH = 512
+WINDOW_HEIGHT = 600
+BOARD_SIZE = 8
 SQUARE_SIZE = WINDOW_WIDTH // BOARD_SIZE
-STATUS_HEIGHT = 88  # Chiều cao phần thông báo
+STATUS_HEIGHT = 88
 
 CLOCK = pygame.time.Clock()
 SCREEN = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-pygame.display.set_caption("Chess Game - Human vs AI")
+pygame.display.set_caption("Chess Game")
 
-# Tải ảnh cho các quân cờ
 def load_images():
     pieces = ["r", "n", "b", "q", "k", "p"]
     colors = ["w", "b"]
@@ -29,7 +27,6 @@ def load_images():
 
 IMAGES = load_images()
 
-# Vẽ bàn cờ và các quân cờ
 def draw_board(screen, board):
     colors = [pygame.Color("white"), pygame.Color("gray")]
 
@@ -44,16 +41,15 @@ def draw_board(screen, board):
                 piece_name = ('w' if piece.color else 'b') + piece_name.lower()
                 screen.blit(IMAGES[piece_name], pygame.Rect(col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE))
 
-# Vẽ thông tin lượt đi
 def draw_status(screen, board):
     status_rect = pygame.Rect(0, WINDOW_WIDTH, WINDOW_WIDTH, STATUS_HEIGHT)
     pygame.draw.rect(screen, pygame.Color("white"), status_rect)
 
     status_font = pygame.font.Font(None, 36)
     if board.turn:
-        status_text = "Lượt đi: Trắng"
+        status_text = "Turn: White"
     else:
-        status_text = "Lượt đi: Đen"
+        status_text = "Turn: Black"
     status_surface = status_font.render(status_text, True, pygame.Color("black"))
     status_position = status_rect.center
     screen.blit(status_surface, status_surface.get_rect(center=status_position))
