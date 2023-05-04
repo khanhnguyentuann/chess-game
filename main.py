@@ -1,98 +1,109 @@
 import pygame
+import sys
+import chess  # Cài đặt thư viện python-chess: pip install python-chess
 
-# Khai báo một số màu sắc cho các quân cờ và bàn cờ
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-GREEN = (0, 128, 0)
-BLUE = (0, 0, 128)
-
-# Khởi tạo bàn cờ với các quân cờ ban đầu
-board = [
-    ["r", "n", "b", "q", "k", "b", "n", "r"],
-    ["p", "p", "p", "p", "p", "p", "p", "p"],
-    [" ", ".", " ", ".", " ", ".", " ", "."],
-    [".", " ", ".", " ", ".", " ", ".", " "],
-    [" ", ".", " ", ".", " ", ".", " ", "."],
-    [".", " ", ".", " ", ".", " ", ".", " "],
-    ["c", "c", "c", "c", "c", "c", "c", "c"],
-    ["x", "m", "t", "h", "v", "t", "m", "x"]
-]
-
-# Khởi tạo Pygame
+# Khởi tạo pygame và đặt cấu hình ban đầu
 pygame.init()
 
-# Thiết lập kích thước cửa sổ và tên của trò chơi
-size = (640, 640)
-screen = pygame.display.set_mode(size)
-pygame.display.set_caption("Cờ vua")
+FPS = 30  # Số khung hình mỗi giây
+WINDOW_WIDTH = 512  # Chiều rộng cửa sổ
+WINDOW_HEIGHT = 600  # Chiều cao cửa sổ
+BOARD_SIZE = 8  # Kích thước bàn cờ
+SQUARE_SIZE = WINDOW_WIDTH // BOARD_SIZE
+STATUS_HEIGHT = 88  # Chiều cao phần thông báo
 
-# Thiết lập font chữ
-font = pygame.font.Font(None, 32)
+CLOCK = pygame.time.Clock()
+SCREEN = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+pygame.display.set_caption("Chess Game - Human vs AI")
 
-# Vòng lặp chính của trò chơi
-done = False
-clock = pygame.time.Clock()
+# Tải ảnh cho các quân cờ
+def load_images():
+    pieces = ["r", "n", "b", "q", "k", "p"]
+    colors = ["w", "b"]
+    images = {}
+    for color in colors:
+        for piece in pieces:
+            name = f"{color}{piece}"
+            images[name] = pygame.transform.scale(pygame.image.load(f"images/{name}.png"), (SQUARE_SIZE, SQUARE_SIZE))
+    return images
 
-# Lấy tọa độ của ô cờ khi người dùng click vào
-def get_coord(pos):
-    x, y = pos
-    row = y // 80
-    col = x // 80
-    return row, col
+IMAGES = load_images()
 
-# Thêm biến để lưu trữ quân cờ được chọn và vị trí của nó
-selected_piece = None
-selected_row, selected_col = None, None
+# Vẽ bàn cờ và các quân cờ
+def draw_board(screen, board):
+    colors = [pygame.Color("white"), pygame.Color("gray")]
 
-while not done:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            done = True
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            pos = pygame.mouse.get_pos()
-            row, col = get_coord(pos)
+    for row in range(BOARD_SIZE):
+        for col in range(BOARD_SIZE):
+            color = colors[((row + col) % 2)]
+            pygame.draw.rect(screen, color, pygame.Rect(col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE))
 
-            if selected_piece:
-                # Di chuyển quân cờ đã chọn đến vị trí mới
-                board[row][col] = selected_piece
-                board[selected_row][selected_col] = " " if (selected_row + selected_col) % 2 == 0 else "."
-                selected_piece = None
-                selected_row, selected_col = None, None
-            elif board[row][col] != " " and board[row][col] != ".":
-                # Chọn quân cờ và lưu lại vị trí của nó
-                selected_piece = board[row][col]
-                selected_row, selected_col = row, col
-                print("Đã click vào quân cờ ở hàng", row, "cột", col)
+            piece = board.piece_at(row * BOARD_SIZE + col)
+            if piece:
+                piece_name = piece.color and piece.symbol().lower() or piece.symbol()
+                piece_name = ('w' if piece.color else 'b') + piece_name.lower()
+                screen.blit(IMAGES[piece_name], pygame.Rect(col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE))
 
-    # Vẽ bàn cờ và các quân cờ
-    for row in range(8):
-        for col in range(8):
-            color = WHITE if (row + col) % 2 == 0 else BLACK
-            pygame.draw.rect(screen, color, [col * 80, row * 80, 80, 80])
-            piece = board[row][col]
-            if piece != " " and piece != ".":
-                img_path = f"images/{piece.lower()}.png"  # Thay "images" bằng thư mục chứa ảnh của bạn
-                img = pygame.image.load(img_path)
-                if piece.isupper():
-                    img = pygame.transform.scale(img, (70, 70))
+# Vẽ thông tin lượt đi
+def draw_status(screen, board):
+    status_rect = pygame.Rect(0, WINDOW_WIDTH, WINDOW_WIDTH, STATUS_HEIGHT)
+    pygame.draw.rect(screen, pygame.Color("white"), status_rect)
+
+    status_font = pygame.font.Font(None, 36)
+    if board.turn:
+        status_text = "Lượt đi: Trắng"
+    else:
+        status_text = "Lượt đi: Đen"
+    status_surface = status_font.render(status_text, True, pygame.Color("black"))
+    status_position = status_rect.center
+    screen.blit(status_surface, status_surface.get_rect(center=status_position))
+
+def draw_selected_square(screen, square):
+    row, col = square // BOARD_SIZE, square % BOARD_SIZE
+    pygame.draw.rect(screen, pygame.Color("blue"), pygame.Rect(col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE), 3)
+
+def draw_valid_moves(screen, valid_moves):
+    for move in valid_moves:
+        row, col = move.to_square // BOARD_SIZE, move.to_square % BOARD_SIZE
+        pygame.draw.circle(screen, pygame.Color("green"), (col * SQUARE_SIZE + SQUARE_SIZE // 2, row * SQUARE_SIZE + SQUARE_SIZE // 2), 10)
+
+# hàm chính để chạy trò chơi
+def main():
+    board = chess.Board()
+    selected_square = None
+    valid_moves = []
+
+    while not board.is_game_over():
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                position = pygame.mouse.get_pos()
+                col, row = position[0] // SQUARE_SIZE, position[1] // SQUARE_SIZE
+                square = row * BOARD_SIZE + col
+
+
+
+                if selected_square is None:
+                    piece = board.piece_at(square)
+                    if piece and (piece.color == board.turn):
+                        selected_square = square
+                        valid_moves = [move for move in board.legal_moves if move.from_square == square]
                 else:
-                    img = pygame.transform.scale(img, (70, 70))
-                screen.blit(img, (col * 80 + 6, row * 80 + 6))
+                    move = chess.Move(selected_square, square)
+                    if move in valid_moves:
+                        board.push(move)
+                    selected_square = None
+                    valid_moves = []
 
-    # Vẽ các ô vuông hỗ trợ chọn quân cờ
-    pygame.draw.rect(screen, GREEN, [0, 0, 640, 640], 5)
-    for row in range(8):
-        for col in range(8):
-            if board[row][col] != " " and board[row][col] != ".":
-                pygame.draw.rect(screen, BLUE, [col * 80, row * 80, 80, 80], 5)
+        draw_board(SCREEN, board)
+        draw_status(SCREEN, board)
+        if selected_square is not None:
+            draw_selected_square(SCREEN, selected_square)
+            draw_valid_moves(SCREEN, valid_moves)
+        pygame.display.flip()
+        CLOCK.tick(FPS)
 
-    # Hiển thị lượt chơi
-    text = font.render("Đến lượt của người chơi 1", True, BLACK)
-    screen.blit(text, [10, 640])
-
-    # Cập nhật màn hình
-    pygame.display.flip()
-    clock.tick(60)
-
-# Đóng cửa sổ Pygame
-pygame.quit()
+if __name__ == "__main__":
+    main()
