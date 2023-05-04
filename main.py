@@ -63,10 +63,10 @@ while not done:
                 img_path = f"images/{piece.lower()}.png"  # Thay "images" bằng thư mục chứa ảnh của bạn
                 img = pygame.image.load(img_path)
                 if piece.isupper():
-                    img = pygame.transform.scale(img, (60, 60))
+                    img = pygame.transform.scale(img, (70, 70))
                 else:
-                    img = pygame.transform.scale(img, (40, 40))
-                screen.blit(img, (col * 80 + 20, row * 80 + 20))
+                    img = pygame.transform.scale(img, (70, 70))
+                screen.blit(img, (col * 80 + 6, row * 80 + 6))
 
     # Vẽ các ô vuông hỗ trợ chọn quân cờ
     pygame.draw.rect(screen, GREEN, [0, 0, 640, 640], 5)
