@@ -10,7 +10,7 @@ WINDOW_HEIGHT = 600
 BOARD_SIZE = 8
 SQUARE_SIZE = WINDOW_WIDTH // BOARD_SIZE
 STATUS_HEIGHT = 88
-####
+
 CLOCK = pygame.time.Clock()
 SCREEN = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 pygame.display.set_caption("Chess Game")
