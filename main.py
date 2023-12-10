@@ -1,6 +1,6 @@
 import pygame
 from chess_game import ChessGame
-from ui import show_start_screen
+from ui import show_start_screen, show_instructions
 from config import WINDOW_WIDTH, WINDOW_HEIGHT
 
 def main():
@@ -8,6 +8,7 @@ def main():
     SCREEN = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
     pygame.display.set_caption("Chess Game")
     show_start_screen(SCREEN)
+    show_instructions(SCREEN)
     game = ChessGame(SCREEN)
     game.main_loop()
 
