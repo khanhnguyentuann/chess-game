@@ -18,5 +18,5 @@ def load_images():
     for color in colors:
         for piece in pieces:
             name = f"{color}{piece}"
-            images[name] = pygame.transform.scale(pygame.image.load(f"images/{name}.png"), (SQUARE_SIZE, SQUARE_SIZE))
+            images[name] = pygame.transform.scale(pygame.image.load(f"assets/images/{name}.png"), (SQUARE_SIZE, SQUARE_SIZE))
     return images

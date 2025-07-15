@@ -1,0 +1,5 @@
+# Chess Game Requirements
+# Production-grade dependencies with pinned versions
+
+pygame==2.5.2
+python-chess==1.999
