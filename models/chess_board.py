@@ -66,12 +66,13 @@ class ChessBoard:
             return True
         return False
     
-    def make_move(self, to_square: int) -> bool:
+    def make_move(self, to_square: int, promotion: Optional[int] = None) -> bool:
         """
         Attempt to make a move from selected square to target square.
         
         Args:
             to_square: Target square index
+            promotion: Piece type for pawn promotion (chess.QUEEN, chess.ROOK, etc.)
             
         Returns:
             True if move was successful
@@ -79,7 +80,22 @@ class ChessBoard:
         if self.selected_square is None:
             return False
             
-        move = chess.Move(self.selected_square, to_square)
+        # Create move with optional promotion
+        if promotion:
+            move = chess.Move(self.selected_square, to_square, promotion)
+        else:
+            move = chess.Move(self.selected_square, to_square)
+            
+        # Check if this is a pawn promotion move that needs promotion piece
+        if move.from_square is not None:
+            piece = self.board.piece_at(move.from_square)
+            if (piece and piece.piece_type == chess.PAWN and 
+                ((piece.color == chess.WHITE and chess.square_rank(to_square) == 7) or
+                 (piece.color == chess.BLACK and chess.square_rank(to_square) == 0))):
+                if promotion is None:
+                    # Default to queen promotion if not specified
+                    move = chess.Move(self.selected_square, to_square, chess.QUEEN)
+        
         if move in self.valid_moves:
             self.board.push(move)
             self.clear_selection()
@@ -161,3 +177,106 @@ class ChessBoard:
         """Reset the board to starting position."""
         self.board = chess.Board()
         self.clear_selection()
+    
+    def can_castle_kingside(self) -> bool:
+        """
+        Check if current player can castle kingside.
+        
+        Returns:
+            True if kingside castling is legal
+        """
+        return self.board.has_kingside_castling_rights(self.board.turn)
+    
+    def can_castle_queenside(self) -> bool:
+        """
+        Check if current player can castle queenside.
+        
+        Returns:
+            True if queenside castling is legal
+        """
+        return self.board.has_queenside_castling_rights(self.board.turn)
+    
+    def get_en_passant_square(self) -> Optional[int]:
+        """
+        Get the en passant target square if available.
+        
+        Returns:
+            Square index where en passant capture is possible, or None
+        """
+        return self.board.ep_square
+    
+    def is_pawn_promotion_move(self, from_square: int, to_square: int) -> bool:
+        """
+        Check if a move would result in pawn promotion.
+        
+        Args:
+            from_square: Source square
+            to_square: Target square
+            
+        Returns:
+            True if move is a pawn promotion
+        """
+        piece = self.board.piece_at(from_square)
+        if not piece or piece.piece_type != chess.PAWN:
+            return False
+            
+        return ((piece.color == chess.WHITE and chess.square_rank(to_square) == 7) or
+                (piece.color == chess.BLACK and chess.square_rank(to_square) == 0))
+    
+    def get_legal_moves_for_square(self, square: int) -> List[chess.Move]:
+        """
+        Get all legal moves for a piece at the given square.
+        
+        Args:
+            square: Square index
+            
+        Returns:
+            List of legal moves from that square
+        """
+        return [move for move in self.board.legal_moves if move.from_square == square]
+    
+    def make_move_from_notation(self, move_notation: str) -> bool:
+        """
+        Make a move using algebraic notation (e.g., 'e4', 'Nf3', 'O-O').
+        
+        Args:
+            move_notation: Move in algebraic notation
+            
+        Returns:
+            True if move was successful
+        """
+        try:
+            move = self.board.parse_san(move_notation)
+            if move in self.board.legal_moves:
+                self.board.push(move)
+                self.clear_selection()
+                return True
+        except ValueError:
+            pass
+        return False
+    
+    def get_board_fen(self) -> str:
+        """
+        Get the current board position in FEN notation.
+        
+        Returns:
+            FEN string representing current position
+        """
+        return self.board.fen()
+    
+    def set_board_from_fen(self, fen: str) -> bool:
+        """
+        Set board position from FEN notation.
+        
+        Args:
+            fen: FEN string
+            
+        Returns:
+            True if FEN was valid and board was set
+        """
+        try:
+            self.board = chess.Board(fen)
+            self.clear_selection()
+            return True
+        except ValueError:
+            return False

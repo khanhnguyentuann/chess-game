@@ -147,28 +147,228 @@ class TestChessBoard:
     
     def test_scholar_mate_checkmate(self):
         """Test a simple checkmate scenario (Scholar's Mate)."""
-        # Perform Scholar's Mate sequence
-        moves = [
-            (12, 28),  # e2-e4
-            (52, 36),  # e7-e5
-            (5, 26),   # f1-c4
-            (57, 42),  # b8-c6
-            (3, 39),   # d1-h5
-            (49, 33),  # a7-a6
-            (39, 61),  # h5xf7# (checkmate)
-        ]
+        # Use algebraic notation for more reliable moves
+        moves = ["e4", "e5", "Bc4", "Nc6", "Qh5", "a6", "Qxf7#"]
         
-        for from_sq, to_sq in moves:
+        for move in moves:
             if self.chess_board.is_game_over():
                 break
-            self.chess_board.select_square(from_sq)
-            self.chess_board.make_move(to_sq)
+            success = self.chess_board.make_move_from_notation(move)
+            assert success, f"Failed to make move: {move}"
         
         # Should be checkmate
         assert self.chess_board.is_game_over()
         result = self.chess_board.get_game_result()
         assert "Checkmate" in result
         assert "White wins" in result
+    
+    def test_castling_kingside(self):
+        """Test kingside castling (O-O)."""
+        # Set up position for white kingside castling
+        moves = ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5"]
+        
+        for move in moves:
+            self.chess_board.make_move_from_notation(move)
+        
+        # White should be able to castle kingside
+        assert self.chess_board.can_castle_kingside()
+        
+        # Perform castling
+        success = self.chess_board.make_move_from_notation("O-O")
+        assert success
+        
+        # Verify king and rook positions after castling
+        assert self.chess_board.get_piece_at(6).piece_type == chess.KING  # King on g1
+        assert self.chess_board.get_piece_at(5).piece_type == chess.ROOK  # Rook on f1
+        assert self.chess_board.get_piece_at(4) is None  # Original king square empty
+        assert self.chess_board.get_piece_at(7) is None  # Original rook square empty
+    
+    def test_castling_queenside(self):
+        """Test queenside castling (O-O-O)."""
+        # Set up position for black queenside castling
+        moves = ["e4", "d5", "Nf3", "Nc6", "Bc4", "Bg4", "d3", "Qd7", "Be3", "O-O-O"]
+        
+        for move in moves[:-1]:  # All moves except the last castling
+            self.chess_board.make_move_from_notation(move)
+        
+        # Black should be able to castle queenside
+        assert self.chess_board.can_castle_queenside()
+        
+        # Perform queenside castling
+        success = self.chess_board.make_move_from_notation("O-O-O")
+        assert success
+        
+        # Verify king and rook positions after castling
+        assert self.chess_board.get_piece_at(58).piece_type == chess.KING  # King on c8
+        assert self.chess_board.get_piece_at(59).piece_type == chess.ROOK  # Rook on d8
+    
+    def test_en_passant_capture(self):
+        """Test en passant pawn capture."""
+        # Set up en passant scenario
+        moves = ["e4", "a6", "e5", "d5"]  # White pawn on e5, black pawn moves d7-d5
+        
+        for move in moves:
+            self.chess_board.make_move_from_notation(move)
+        
+        # There should be an en passant square available
+        en_passant_square = self.chess_board.get_en_passant_square()
+        assert en_passant_square is not None
+        assert en_passant_square == chess.D6  # d6 square
+        
+        # Perform en passant capture
+        success = self.chess_board.make_move_from_notation("exd6")
+        assert success
+        
+        # Verify the captured pawn is removed
+        assert self.chess_board.get_piece_at(chess.D5) is None  # Captured pawn gone
+        assert self.chess_board.get_piece_at(chess.D6).piece_type == chess.PAWN  # Capturing pawn moved
+    
+    def test_pawn_promotion_to_queen(self):
+        """Test pawn promotion to queen."""
+        # Set up a position where white pawn can promote
+        fen = "8/P7/8/8/8/8/8/K6k w - - 0 1"  # White pawn on a7, ready to promote
+        self.chess_board.set_board_from_fen(fen)
+        
+        # Check if promotion move is detected
+        assert self.chess_board.is_pawn_promotion_move(chess.A7, chess.A8)
+        
+        # Promote pawn to queen
+        self.chess_board.select_square(chess.A7)
+        success = self.chess_board.make_move(chess.A8, chess.QUEEN)
+        assert success
+        
+        # Verify promotion
+        promoted_piece = self.chess_board.get_piece_at(chess.A8)
+        assert promoted_piece.piece_type == chess.QUEEN
+        assert promoted_piece.color == chess.WHITE
+    
+    def test_pawn_promotion_to_rook(self):
+        """Test pawn promotion to rook."""
+        # Set up a position where black pawn can promote
+        fen = "k6K/8/8/8/8/8/p7/8 b - - 0 1"  # Black pawn on a2, ready to promote
+        self.chess_board.set_board_from_fen(fen)
+        
+        # Promote pawn to rook
+        self.chess_board.select_square(chess.A2)
+        success = self.chess_board.make_move(chess.A1, chess.ROOK)
+        assert success
+        
+        # Verify promotion
+        promoted_piece = self.chess_board.get_piece_at(chess.A1)
+        assert promoted_piece.piece_type == chess.ROOK
+        assert promoted_piece.color == chess.BLACK
+    
+    def test_pawn_promotion_default_queen(self):
+        """Test that pawn promotion defaults to queen when no piece specified."""
+        # Set up a position where white pawn can promote
+        fen = "8/P7/8/8/8/8/8/K6k w - - 0 1"
+        self.chess_board.set_board_from_fen(fen)
+        
+        # Promote without specifying piece (should default to queen)
+        self.chess_board.select_square(chess.A7)
+        success = self.chess_board.make_move(chess.A8)  # No promotion piece specified
+        assert success
+        
+        # Should default to queen
+        promoted_piece = self.chess_board.get_piece_at(chess.A8)
+        assert promoted_piece.piece_type == chess.QUEEN
+    
+    def test_castling_rights_lost_after_king_move(self):
+        """Test that castling rights are lost after king moves."""
+        # Set up for castling
+        moves = ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5"]
+        for move in moves:
+            self.chess_board.make_move_from_notation(move)
+        
+        # Initially can castle
+        assert self.chess_board.can_castle_kingside()
+        
+        # Move king - this should permanently lose castling rights
+        self.chess_board.make_move_from_notation("Kf1")
+        
+        # Check that we're now on black's turn and white can't castle
+        assert self.chess_board.get_current_player() == False  # Black's turn
+        
+        # Make a black move to get back to white's turn
+        self.chess_board.make_move_from_notation("d6")
+        
+        # Now it's white's turn again, but should not be able to castle
+        assert self.chess_board.get_current_player() == True  # White's turn
+        assert not self.chess_board.can_castle_kingside()
+    
+    def test_castling_rights_lost_after_rook_move(self):
+        """Test that castling rights are lost after rook moves."""
+        # Set up for queenside castling - need to clear queenside first
+        moves = ["d4", "d5", "Nc3", "Nc6", "Bf4", "Bf5", "Qd2", "Qd7", "Bd2", "Be6"]
+        for move in moves:
+            self.chess_board.make_move_from_notation(move)
+        
+        # Initially can castle queenside
+        assert self.chess_board.can_castle_queenside()
+        
+        # Move queenside rook - this should lose castling rights
+        self.chess_board.make_move_from_notation("Rb1")
+        
+        # Check that we're now on black's turn and white can't castle queenside
+        assert self.chess_board.get_current_player() == False  # Black's turn
+        
+        # Make a black move to get back to white's turn
+        self.chess_board.make_move_from_notation("Rd8")
+        
+        # Now it's white's turn again, but should not be able to castle queenside
+        assert self.chess_board.get_current_player() == True  # White's turn
+        assert not self.chess_board.can_castle_queenside()
+    
+    def test_fen_import_export(self):
+        """Test FEN import and export functionality."""
+        # Test standard starting position
+        starting_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+        
+        # Export current position
+        current_fen = self.chess_board.get_board_fen()
+        assert current_fen == starting_fen
+        
+        # Test custom position
+        custom_fen = "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4"
+        success = self.chess_board.set_board_from_fen(custom_fen)
+        assert success
+        
+        # Verify the position was set correctly
+        exported_fen = self.chess_board.get_board_fen()
+        assert exported_fen == custom_fen
+    
+    def test_algebraic_notation_moves(self):
+        """Test making moves using algebraic notation."""
+        # Test various move types
+        moves = [
+            "e4",      # Pawn move
+            "e5",      # Pawn move
+            "Nf3",     # Knight move
+            "Nc6",     # Knight move
+            "Bb5",     # Bishop move
+            "a6",      # Pawn move
+            "Ba4",     # Bishop move
+            "Nf6",     # Knight move
+            "O-O",     # Castling
+            "Be7",     # Bishop move
+            "Re1",     # Rook move
+            "b5",      # Pawn move
+            "Bb3",     # Bishop move
+        ]
+        
+        for move in moves:
+            success = self.chess_board.make_move_from_notation(move)
+            assert success, f"Failed to make move: {move}"
+    
+    def test_stalemate_detection(self):
+        """Test stalemate detection."""
+        # Set up a classic stalemate position
+        stalemate_fen = "k7/P7/K7/8/8/8/8/8 b - - 0 1"  # Black king in stalemate
+        self.chess_board.set_board_from_fen(stalemate_fen)
+        
+        assert self.chess_board.is_game_over()
+        result = self.chess_board.get_game_result()
+        assert "Stalemate" in result
 
 
 if __name__ == "__main__":

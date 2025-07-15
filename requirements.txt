@@ -3,3 +3,6 @@
 
 pygame==2.5.2
 python-chess==1.999
+
+# Testing dependencies
+pytest==7.4.3
