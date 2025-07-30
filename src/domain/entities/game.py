@@ -487,7 +487,7 @@ class Game:
             "winner": self.winner.value if self.winner else None,
             "end_reason": self.end_reason,
             "move_count": self._move_count,
-            "fen": self._board.to_fen(),
+            "fen": self._board.fen,
             "state": self._state.value,
             "in_check": self._board.is_in_check() if hasattr(self._board, 'is_in_check') else False
         }
