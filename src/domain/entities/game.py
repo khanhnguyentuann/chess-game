@@ -168,6 +168,9 @@ class Game:
         self._update_timestamp()
         self.clear_selection()
         
+        # Switch to the other player
+        self.switch_player()
+        
         # Check for game end conditions
         self._update_game_state()
         

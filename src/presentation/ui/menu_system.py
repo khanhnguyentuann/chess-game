@@ -40,7 +40,9 @@ class MenuSystem:
     
     def __init__(self):
         """Initialize the menu system."""
-        pygame.init()
+        # Only initialize pygame if not already initialized
+        if not pygame.get_init():
+            pygame.init()
         
         # Window settings
         self.WINDOW_WIDTH = 800

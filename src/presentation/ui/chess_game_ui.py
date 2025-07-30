@@ -15,6 +15,7 @@ from ...domain.entities.board import Board
 from ...shared.types.enums import Player, GameState, GameResult
 from ...shared.types.type_definitions import MoveRequest
 from ...composition_root import get_container, reset_container
+from .piece_renderer import PieceRenderer
 
 
 class ChessGameUI:
@@ -22,7 +23,9 @@ class ChessGameUI:
     
     def __init__(self):
         """Initialize the chess game UI."""
-        pygame.init()
+        # Only initialize pygame if not already initialized
+        if not pygame.get_init():
+            pygame.init()
         
         # Window settings
         self.WINDOW_WIDTH = 800
@@ -48,8 +51,8 @@ class ChessGameUI:
         pygame.display.set_caption("Chess Game - Clean Architecture")
         self.clock = pygame.time.Clock()
         
-        # Load piece images
-        self.piece_images = self._load_piece_images()
+        # Initialize piece renderer
+        self.piece_renderer = PieceRenderer(self.SQUARE_SIZE)
         
         # Game state
         self.game = None
@@ -63,27 +66,16 @@ class ChessGameUI:
         self.font = pygame.font.Font(None, 36)
         self.small_font = pygame.font.Font(None, 24)
     
-    def _load_piece_images(self) -> dict:
-        """Load chess piece images."""
-        images = {}
-        piece_names = ['wp', 'wr', 'wn', 'wb', 'wq', 'wk', 'bp', 'br', 'bn', 'bb', 'bq', 'bk']
+    def _get_piece_surface(self, piece_code: str) -> pygame.Surface:
+        """Get a surface with the rendered piece.
         
-        # Get assets directory
-        assets_dir = Path(__file__).parent.parent.parent.parent / "assets" / "images"
-        
-        for piece in piece_names:
-            image_path = assets_dir / f"{piece}.png"
-            if image_path.exists():
-                img = pygame.image.load(str(image_path))
-                img = pygame.transform.scale(img, (self.SQUARE_SIZE, self.SQUARE_SIZE))
-                images[piece] = img
-            else:
-                # Create a placeholder if image not found
-                surf = pygame.Surface((self.SQUARE_SIZE, self.SQUARE_SIZE))
-                surf.fill(self.WHITE if piece[0] == 'w' else self.BLACK)
-                images[piece] = surf
-        
-        return images
+        Args:
+            piece_code: Piece code (e.g., 'wp', 'br', 'wk', etc.)
+            
+        Returns:
+            pygame.Surface with the rendered piece
+        """
+        return self.piece_renderer.get_piece_surface(piece_code)
     
     def _get_square_from_mouse(self, mouse_pos: Tuple[int, int]) -> Optional[int]:
         """Convert mouse position to chess square index."""
@@ -148,8 +140,9 @@ class ChessGameUI:
                 piece = self.game.board.get_piece_at(square)
                 if piece:
                     piece_symbol = self._get_piece_symbol(piece)
-                    if piece_symbol and piece_symbol in self.piece_images:
-                        self.screen.blit(self.piece_images[piece_symbol], (x, y))
+                    if piece_symbol:
+                        piece_surface = self._get_piece_surface(piece_symbol)
+                        self.screen.blit(piece_surface, (x, y))
     
     def _draw_ui(self):
         """Draw UI elements."""
@@ -237,9 +230,22 @@ class ChessGameUI:
                     break
             
             if valid_move:
+                # Check if this is a pawn promotion move
+                promotion = None
+                if valid_move.promotion:
+                    # Auto-promote to queen (piece type 5)
+                    promotion = 5
+                
                 # Make the move
-                if self.game.make_move(square):
-                    self._show_message(f"Move: {chr(ord('a') + self.selected_square % 8)}{8 - self.selected_square // 8} to {chr(ord('a') + square % 8)}{8 - square // 8}")
+                if self.game.make_move(square, promotion):
+                    move_text = f"Move: {chr(ord('a') + self.selected_square % 8)}{8 - self.selected_square // 8} to {chr(ord('a') + square % 8)}{8 - square // 8}"
+                    if promotion:
+                        move_text += " (promoted to Queen)"
+                    self._show_message(move_text)
+                    
+                    # Reset selection after successful move
+                    self.selected_square = None
+                    self.valid_moves = []
                     
                     # Check for game over
                     if self.game.is_game_over:
