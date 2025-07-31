@@ -17,10 +17,7 @@ from ...shared.types.enums import Player
 class MakeMoveCommand(ICommand):
     """Command for making a chess move."""
     
-    def __init__(self, 
-                 game: Game, 
-                 move_request: MoveRequest,
-                 validator: IMoveValidationService):
+    def __init__(self, game: Game, move_request: MoveRequest, validator: IMoveValidationService):
         super().__init__()
         self.game = game
         self.move_request = move_request
@@ -30,7 +27,6 @@ class MakeMoveCommand(ICommand):
         self.move_executed: Optional[chess.Move] = None
     
     async def execute(self) -> CommandResult:
-        """Execute the move command."""
         try:
             # Validate the move
             if not self.validator.validate_move_request(self.game, self.move_request):

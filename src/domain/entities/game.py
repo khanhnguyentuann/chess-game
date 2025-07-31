@@ -4,6 +4,7 @@ MIGRATED FROM: models/chess_board.py (game state management logic)
 """
 
 import uuid
+import random
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 import chess
@@ -26,13 +27,19 @@ class Game:
                  black_player: str = "Black",
                  game_id: Optional[str] = None,
                  board: Optional[Board] = None,
-                 event_publisher: Optional[EventPublisher] = None):
+                 event_publisher: Optional[EventPublisher] = None,
+                 random_first_player: bool = True):
         """Initialize a new chess game."""
         self.game_id = game_id or str(uuid.uuid4())
         self.id = self.game_id  # Backward compatibility
         self.white_player = white_player
         self.black_player = black_player
-        self._current_player = Player.WHITE
+        
+        # Randomly choose first player if requested
+        if random_first_player:
+            self._current_player = random.choice([Player.WHITE, Player.BLACK])
+        else:
+            self._current_player = Player.WHITE
         self.is_ended = False
         self.winner: Optional[Player] = None
         self.end_reason: Optional[str] = None
@@ -40,18 +47,29 @@ class Game:
         self.updated_at = datetime.now()
         
         self._board = board or Board(event_publisher)
+        
+        # If we created a new board and want a random first player,
+        # we need to reset it with the chosen player
+        if board is None and random_first_player:
+            self._board.reset_to_starting_position(self._current_player)
+        
         self._state = GameState.PLAYING
         self._selected_square: Optional[int] = None
         self._valid_moves_from_selected: List[chess.Move] = []
         self._event_publisher = event_publisher
         
-        # Move history
-        self.move_history = MoveHistory(game_id=self.game_id)
-        
         # Game statistics
         self._move_count = 0
         self._white_time_remaining: Optional[float] = None
         self._black_time_remaining: Optional[float] = None
+
+        try:
+            self._board.internal_board.turn = self._current_player.chess_value
+        except Exception:
+            pass
+
+        # Move history
+        self.move_history = MoveHistory(game_id=self.game_id)
     
     @property
     def board(self) -> Board:
@@ -67,6 +85,17 @@ class Game:
     def current_player(self) -> Player:
         """Get current player to move."""
         return self._current_player
+    
+    @current_player.setter
+    def current_player(self, player: Player) -> None:
+        if player != self._current_player:
+            self._current_player = player
+            try:
+                # True for white, False for black
+                self._board.internal_board.turn = player.chess_value
+            except Exception:
+                pass
+            self.updated_at = datetime.now()
     
     @property
     def selected_square(self) -> Optional[int]:
@@ -210,12 +239,6 @@ class Game:
         return self.make_move(to_square, promotion)
     
     def undo_last_move(self) -> bool:
-        """
-        Undo the last move if possible.
-        
-        Returns:
-            True if undo was successful
-        """
         if self._state != GameState.PLAYING or self._move_count == 0:
             return False
         
@@ -223,6 +246,7 @@ class Game:
             self._move_count -= 1
             self._update_timestamp()
             self.clear_selection()
+            self._current_player = Player.WHITE if self._board.internal_board.turn else Player.BLACK
             
             # Update game state (might change from checkmate back to playing)
             self._update_game_state()
@@ -241,13 +265,22 @@ class Game:
         
         return False
     
-    def reset_game(self) -> None:
+    def reset_game(self, random_first_player: bool = True) -> None:
         """Reset game to initial state."""
-        self._board.reset_to_starting_position()
+        # Randomly choose first player if requested
+        if random_first_player:
+            self._current_player = random.choice([Player.WHITE, Player.BLACK])
+        else:
+            self._current_player = Player.WHITE
+        
+        # Reset board with the chosen first player
+        self._board.reset_to_starting_position(self._current_player)
+        
         self._state = GameState.PLAYING
         self._move_count = 0
         self._selected_square = None
         self._valid_moves_from_selected.clear()
+        self._current_player = Player.WHITE if self._board.internal_board.turn else Player.BLACK
         self._update_timestamp()
         
         if self._event_publisher:
@@ -399,7 +432,7 @@ class Game:
     @classmethod
     def from_dict(cls, data: dict, event_publisher: Optional[EventPublisher] = None) -> 'Game':
         """Create game from dictionary."""
-        game = cls(data['id'], event_publisher)
+        game = cls(game_id=data['id'], event_publisher=event_publisher)
         game.created_at = datetime.fromisoformat(data['created_at'])
         game.updated_at = datetime.fromisoformat(data['updated_at'])
         game._board.set_position_from_fen(data['fen'])
@@ -408,6 +441,7 @@ class Game:
         game._selected_square = data.get('selected_square')
         game._white_time_remaining = data.get('white_time')
         game._black_time_remaining = data.get('black_time')
+        game._current_player = Player.WHITE if game._board.internal_board.turn else Player.BLACK
         
         return game
     
@@ -452,8 +486,7 @@ class Game:
         return self.move_history
     
     def switch_player(self) -> None:
-        """Switch to the other player."""
-        self._current_player = Player.BLACK if self._current_player == Player.WHITE else Player.WHITE
+        self._current_player = Player.WHITE if self._board.internal_board.turn else Player.BLACK
         self.updated_at = datetime.now()
     
     def get_previous_player(self) -> Player:

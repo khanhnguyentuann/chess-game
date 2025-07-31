@@ -166,9 +166,16 @@ class Board:
         except IndexError:
             return False
     
-    def reset_to_starting_position(self) -> None:
+    def reset_to_starting_position(self, first_player: Optional[Player] = None) -> None:
         """Reset board to starting position."""
-        self._board = chess.Board()
+        if first_player == Player.BLACK:
+            # Use FEN with black to move
+            starting_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1"
+            self._board = chess.Board(starting_fen)
+        else:
+            # Default starting position (white to move)
+            self._board = chess.Board()
+        
         self._move_history.clear()
         
         if self._event_publisher:
@@ -255,17 +262,7 @@ class Board:
         return self._board.is_game_over()
     
     def has_castling_rights(self, player: Player, kingside: bool = True) -> bool:
-        """
-        Check castling rights.
-        
-        Args:
-            player: Player to check
-            kingside: True for kingside, False for queenside
-            
-        Returns:
-            True if player has castling rights
-        """
-        color = player.value  # True for white, False for black
+        color = player.chess_value
         if kingside:
             return self._board.has_kingside_castling_rights(color)
         else:
@@ -301,8 +298,8 @@ class Board:
         return f"Board(fen='{self.fen}')"
     
     def to_fen(self) -> str:
-        """Get FEN (Forsyth-Edwards Notation) representation of board."""
-        return self._board.fen
+        # Call the python‑chess Board.fen() method to get the FEN string.
+        return self._board.fen()
     
     def load_from_fen(self, fen: str) -> bool:
         """Load board position from FEN string."""
