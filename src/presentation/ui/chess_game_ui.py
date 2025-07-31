@@ -27,13 +27,21 @@ class ChessGameUI:
         if not pygame.get_init():
             pygame.init()
         
-        # Window settings
-        self.WINDOW_WIDTH = 800
-        self.WINDOW_HEIGHT = 600
+        # --- Layout constants ---
+        # Reserve space for a top information panel and a bottom button panel.
+        # The central area contains the chess board.
+        self.INFO_PANEL_HEIGHT = 90
+        self.BUTTON_PANEL_HEIGHT = 60
         self.BOARD_SIZE = 560
+        self.WINDOW_WIDTH = 900
+        self.WINDOW_HEIGHT = self.INFO_PANEL_HEIGHT + self.BOARD_SIZE + self.BUTTON_PANEL_HEIGHT + 20
+
+        # Size of individual squares
         self.SQUARE_SIZE = self.BOARD_SIZE // 8
+
+        # Offsets for board drawing
         self.BOARD_OFFSET_X = (self.WINDOW_WIDTH - self.BOARD_SIZE) // 2
-        self.BOARD_OFFSET_Y = (self.WINDOW_HEIGHT - self.BOARD_SIZE) // 2
+        self.BOARD_OFFSET_Y = self.INFO_PANEL_HEIGHT
         
         # Colors
         self.WHITE = (255, 255, 255)
@@ -61,10 +69,39 @@ class ChessGameUI:
         self.game_over = False
         self.message = ""
         self.message_timer = 0
+        # For displaying last move and selection in the info panel
+        self.last_move_text = ""
         
         # Font
         self.font = pygame.font.Font(None, 36)
         self.small_font = pygame.font.Font(None, 24)
+
+        # Button definitions (reset, undo, quit).  They live in the bottom panel.
+        self.BUTTON_WIDTH = 120
+        self.BUTTON_HEIGHT = 40
+        self.reset_button_rect = pygame.Rect(
+            50,
+            self.WINDOW_HEIGHT - self.BUTTON_PANEL_HEIGHT + 10,
+            self.BUTTON_WIDTH,
+            self.BUTTON_HEIGHT,
+        )
+        self.undo_button_rect = pygame.Rect(
+            50 + self.BUTTON_WIDTH + 30,
+            self.WINDOW_HEIGHT - self.BUTTON_PANEL_HEIGHT + 10,
+            self.BUTTON_WIDTH,
+            self.BUTTON_HEIGHT,
+        )
+        self.quit_button_rect = pygame.Rect(
+            50 + 2 * (self.BUTTON_WIDTH + 30),
+            self.WINDOW_HEIGHT - self.BUTTON_PANEL_HEIGHT + 10,
+            self.BUTTON_WIDTH,
+            self.BUTTON_HEIGHT,
+        )
+        self.buttons = [
+            (self.reset_button_rect, "Reset"),
+            (self.undo_button_rect, "Undo"),
+            (self.quit_button_rect, "Quit"),
+        ]
     
     def _get_piece_surface(self, piece_code: str) -> pygame.Surface:
         """Get a surface with the rendered piece.
@@ -115,7 +152,7 @@ class ChessGameUI:
         return f"{color}{piece_map[piece_type]}"
     
     def _draw_board(self):
-        """Draw the chess board."""
+        """Draw the chess board inside its allocated region."""
         for row in range(8):
             for col in range(8):
                 x = self.BOARD_OFFSET_X + col * self.SQUARE_SIZE
@@ -146,47 +183,59 @@ class ChessGameUI:
     
     def _draw_ui(self):
         """Draw UI elements."""
-        # Draw background
+        # Fill the window
         self.screen.fill(self.BACKGROUND)
-        
-        # Draw board
+
+        # Draw the information panel at the top
+        self._draw_info_panel()
+
+        # Draw the board
         self._draw_board()
-        
-        # Draw game info
-        self._draw_game_info()
-        
-        # Draw message
+
+        # Draw the buttons at the bottom
+        self._draw_buttons()
+
+        # Draw message overlay if needed
         if self.message and self.message_timer > 0:
             self._draw_message()
     
-    def _draw_game_info(self):
-        """Draw game information."""
+    def _draw_info_panel(self):
+        """Draw the top information panel (current player, selection, last move)."""
+        panel_rect = pygame.Rect(0, 0, self.WINDOW_WIDTH, self.INFO_PANEL_HEIGHT)
+        pygame.draw.rect(self.screen, (40, 40, 40), panel_rect)
+
         # Current player
-        player_text = f"Current Player: {self.game.current_player.value.title()}"
-        player_surface = self.font.render(player_text, True, self.TEXT_COLOR)
-        self.screen.blit(player_surface, (10, 10))
-        
-        # Move count
-        move_text = f"Moves: {self.game.move_count}"
-        move_surface = self.small_font.render(move_text, True, self.TEXT_COLOR)
-        self.screen.blit(move_surface, (10, 50))
-        
-        # Game state
-        state_text = f"State: {self.game.state.value.title()}"
-        state_surface = self.small_font.render(state_text, True, self.TEXT_COLOR)
-        self.screen.blit(state_surface, (10, 70))
-        
-        # Instructions
-        instructions = [
-            "Click to select and move pieces",
-            "R - Reset game",
-            "U - Undo move",
-            "ESC - Quit"
-        ]
-        
-        for i, instruction in enumerate(instructions):
-            inst_surface = self.small_font.render(instruction, True, self.TEXT_COLOR)
-            self.screen.blit(inst_surface, (10, self.WINDOW_HEIGHT - 100 + i * 20))
+        cp_text = f"Current player: {self.game.current_player.value.title()}"
+        cp_surface = self.font.render(cp_text, True, self.TEXT_COLOR)
+        self.screen.blit(cp_surface, (20, 10))
+
+        # Selected square (if any)
+        sel_text = "Selected square: "
+        if self.selected_square is not None:
+            col = chr(ord('a') + self.selected_square % 8)
+            row = str(8 - self.selected_square // 8)
+            sel_text += f"{col}{row}"
+        else:
+            sel_text += "–"
+        sel_surface = self.small_font.render(sel_text, True, self.TEXT_COLOR)
+        self.screen.blit(sel_surface, (20, 50))
+
+        # Last move (if any)
+        lm_text = f"Last move: {self.last_move_text or '–'}"
+        lm_surface = self.small_font.render(lm_text, True, self.TEXT_COLOR)
+        self.screen.blit(lm_surface, (20, 70))
+
+    def _draw_buttons(self):
+        """Draw the reset/undo/quit buttons."""
+        for rect, label in self.buttons:
+            # Draw the button rectangle
+            pygame.draw.rect(self.screen, (80, 80, 80), rect)
+            pygame.draw.rect(self.screen, (255, 255, 255), rect, 2)
+
+            # Centre the text on the button
+            text_surface = self.small_font.render(label, True, self.TEXT_COLOR)
+            text_rect = text_surface.get_rect(center=rect.center)
+            self.screen.blit(text_surface, text_rect)
     
     def _draw_message(self):
         """Draw temporary message."""
@@ -207,6 +256,31 @@ class ChessGameUI:
     
     def _handle_mouse_click(self, mouse_pos: Tuple[int, int]):
         """Handle mouse click events."""
+        # First check if the user clicked on a button (bottom panel)
+        if self.reset_button_rect.collidepoint(mouse_pos):
+            # Reset game button
+            self.game.reset_game()
+            self.selected_square = None
+            self.valid_moves = []
+            self.last_move_text = ""
+            self._show_message("Game reset")
+            return
+        elif self.undo_button_rect.collidepoint(mouse_pos):
+            # Undo button
+            if self.game.undo_last_move():
+                self.selected_square = None
+                self.valid_moves = []
+                self.last_move_text = ""  # Could derive from move history
+                self._show_message("Move undone")
+            else:
+                self._show_message("No moves to undo")
+            return
+        elif self.quit_button_rect.collidepoint(mouse_pos):
+            # Quit button: return to menu
+            pygame.event.post(pygame.event.Event(pygame.QUIT))
+            return
+
+        # Otherwise handle a click on the board
         square = self._get_square_from_mouse(mouse_pos)
         if square is None:
             return
@@ -216,7 +290,8 @@ class ChessGameUI:
             if self.game.select_square(square):
                 self.selected_square = square
                 self.valid_moves = self.game.valid_moves_from_selected
-                self._show_message(f"Selected square {chr(ord('a') + square % 8)}{8 - square // 8}")
+                # Update the info panel instead of showing a transient message
+                self._show_message("")  # Clear any previous message
             else:
                 self._show_message("Invalid selection")
         
@@ -238,14 +313,16 @@ class ChessGameUI:
                 
                 # Make the move
                 if self.game.make_move(square, promotion):
-                    move_text = f"Move: {chr(ord('a') + self.selected_square % 8)}{8 - self.selected_square // 8} to {chr(ord('a') + square % 8)}{8 - square // 8}"
+                    # Compose human‑readable move text for info panel
+                    move_algebraic = f"{chr(ord('a') + self.selected_square % 8)}{8 - self.selected_square // 8} → {chr(ord('a') + square % 8)}{8 - square // 8}"
                     if promotion:
-                        move_text += " (promoted to Queen)"
-                    self._show_message(move_text)
-                    
-                    # Reset selection after successful move
+                        move_algebraic += " (Q)"
+                    self.last_move_text = move_algebraic
+
+                    # Clear selection and valid moves
                     self.selected_square = None
                     self.valid_moves = []
+                    self._show_message("")  # Clear any previous message
                     
                     # Check for game over
                     if self.game.is_game_over:
@@ -269,22 +346,9 @@ class ChessGameUI:
     
     def _handle_key_press(self, key):
         """Handle keyboard events."""
-        if key == pygame.K_r:  # Reset game
-            self.game.reset_game()
-            self.selected_square = None
-            self.valid_moves = []
-            self._show_message("Game reset")
-        
-        elif key == pygame.K_u:  # Undo move
-            if self.game.undo_last_move():
-                self.selected_square = None
-                self.valid_moves = []
-                self._show_message("Move undone")
-            else:
-                self._show_message("No moves to undo")
-        
-        elif key == pygame.K_ESCAPE:  # Return to menu
-            return "menu"  # Signal to return to menu
+        # Keyboard controls are no longer needed; players use on‑screen buttons.
+        if key == pygame.K_ESCAPE:
+            return "menu"
     
     def run(self):
         """Main game loop."""
