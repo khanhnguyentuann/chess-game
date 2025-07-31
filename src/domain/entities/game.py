@@ -426,7 +426,11 @@ class Game:
             'move_count': self._move_count,
             'selected_square': self._selected_square,
             'white_time': self._white_time_remaining,
-            'black_time': self._black_time_remaining
+            'black_time': self._black_time_remaining,
+            # New fields for saving/restoring
+            'current_player': self._current_player.value,
+            # Store move history in UCI notation so it can be re‑applied if needed
+            'move_history': [m.uci() for m in self._board.move_history]
         }
     
     @classmethod
@@ -442,7 +446,29 @@ class Game:
         game._white_time_remaining = data.get('white_time')
         game._black_time_remaining = data.get('black_time')
         game._current_player = Player.WHITE if game._board.internal_board.turn else Player.BLACK
-        
+        # Set current player from saved data (defaults to White)
+        from ...shared.types.enums import Player
+        cp_str = data.get('current_player', 'white')
+        game.current_player = Player(cp_str)
+
+        # Restore move history if needed (not strictly required when FEN is saved)
+        # Here we simply record the history rather than re‑applying moves,
+        # because the FEN already reflects the final position.
+        move_history_uci = data.get('move_history', [])
+        from chess import Move
+        # Convert UCI strings back to Move objects for history
+        for uci_str in move_history_uci:
+            move = Move.from_uci(uci_str)
+            game.move_history.add_move(
+                move=move,
+                player=game._current_player,  # or derive from move parity
+                fen_before=game._board.to_fen(),
+                fen_after=game._board.to_fen(),
+                captured_piece=None,
+                is_check=False,
+                is_checkmate=False,
+                annotation=uci_str
+            )
         return game
     
     def __str__(self) -> str:

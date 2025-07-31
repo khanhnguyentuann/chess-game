@@ -89,12 +89,24 @@ class MenuSystem:
             {"name": "Game 1", "date": "2024-01-15", "moves": 12},
             {"name": "Game 2", "date": "2024-01-16", "moves": 8}
         ]
+
+        import os, json
+        self.saved_games = []
+        if os.path.exists("saved_game.json"):
+            # We only have a single save slot; read metadata for display
+            with open("saved_game.json", "r", encoding="utf-8") as f:
+                data = json.load(f)
+            # The saved data might include created_at or move_count
+            game_name = f"{data.get('id', 'Saved Game')}"
+            moves = data.get('move_count', 0)
+            # Append a dictionary with basic info; add date if desired
+            self.saved_games.append({"name": game_name, "moves": moves})
     
     def _get_main_menu_items(self) -> List[MenuItem]:
         """Get main menu items."""
         return [
             MenuItem("New Game", "new_game"),
-            MenuItem("Continue Game", "continue_game", len(self.saved_games) > 0),
+            MenuItem("Continue Game", "continue_game", bool(self.saved_games)),
             MenuItem("Help", "help"),
             MenuItem("Quit", "quit")
         ]
@@ -254,9 +266,28 @@ class MenuSystem:
     
     def _continue_game(self):
         """Continue a saved game."""
-        # For now, just start a new game
-        # In a real implementation, this would show a list of saved games
-        self._start_new_game()
+        # Read the saved game file
+        import json, os
+        if not os.path.exists("saved_game.json"):
+            # Fallback: start new game if no save is found
+            self._start_new_game()
+            return
+        with open("saved_game.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        # Reconstruct the game
+        from ...domain.entities.game import Game
+        from ...shared.types.enums import Player
+        game = Game.from_dict(data)
+        # Start the UI with the loaded game
+        self.game = game
+        self.current_state = MenuState.GAME_PLAYING
+        from .chess_game_ui import ChessGameUI
+        game_ui = ChessGameUI()
+        game_ui.game = self.game
+        result = game_ui.run()
+        # After returning from UI, reload saved games list (it might have been removed)
+        self._load_saved_games()
+        self.current_state = MenuState.MAIN_MENU
     
     def _handle_mouse_click(self, pos: Tuple[int, int]):
         """Handle mouse clicks on menu items."""

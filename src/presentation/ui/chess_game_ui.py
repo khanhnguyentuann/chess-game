@@ -22,8 +22,6 @@ class ChessGameUI:
     """Pygame-based chess game user interface."""
     
     def __init__(self):
-        """Initialize the chess game UI."""
-        # Only initialize pygame if not already initialized
         if not pygame.get_init():
             pygame.init()
         
@@ -71,6 +69,13 @@ class ChessGameUI:
         self.message_timer = 0
         # For displaying last move and selection in the info panel
         self.last_move_text = ""
+
+        # Quit dialog state
+        self.show_quit_dialog = False
+        self.quit_dialog_buttons = {
+            "save": pygame.Rect(self.WINDOW_WIDTH // 2 - 140, self.WINDOW_HEIGHT // 2 + 30, 120, 40),
+            "quit": pygame.Rect(self.WINDOW_WIDTH // 2 + 20,  self.WINDOW_HEIGHT // 2 + 30, 120, 40)
+        }
         
         # Font
         self.font = pygame.font.Font(None, 36)
@@ -104,14 +109,6 @@ class ChessGameUI:
         ]
     
     def _get_piece_surface(self, piece_code: str) -> pygame.Surface:
-        """Get a surface with the rendered piece.
-        
-        Args:
-            piece_code: Piece code (e.g., 'wp', 'br', 'wk', etc.)
-            
-        Returns:
-            pygame.Surface with the rendered piece
-        """
         return self.piece_renderer.get_piece_surface(piece_code)
     
     def _get_square_from_mouse(self, mouse_pos: Tuple[int, int]) -> Optional[int]:
@@ -198,6 +195,34 @@ class ChessGameUI:
         # Draw message overlay if needed
         if self.message and self.message_timer > 0:
             self._draw_message()
+
+            # Draw quit confirmation dialog if active
+        if self.show_quit_dialog:
+            self._draw_quit_dialog()
+
+    def _draw_quit_dialog(self):
+        """Render the quit confirmation popup."""
+        # Semi‑transparent overlay
+        overlay = pygame.Surface((self.WINDOW_WIDTH, self.WINDOW_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 150))
+        self.screen.blit(overlay, (0, 0))
+        # Dialog box
+        box_rect = pygame.Rect(self.WINDOW_WIDTH // 2 - 200, self.WINDOW_HEIGHT // 2 - 80, 400, 150)
+        pygame.draw.rect(self.screen, (60, 60, 60), box_rect)
+        pygame.draw.rect(self.screen, (255, 255, 255), box_rect, 2)
+        # Message
+        msg = "Do you want to save your current game before quitting?"
+        text_surf = self.small_font.render(msg, True, self.TEXT_COLOR)
+        text_rect = text_surf.get_rect(center=(self.WINDOW_WIDTH // 2, self.WINDOW_HEIGHT // 2 - 20))
+        self.screen.blit(text_surf, text_rect)
+        # Buttons
+        for key, rect in self.quit_dialog_buttons.items():
+            pygame.draw.rect(self.screen, (80, 80, 80), rect)
+            pygame.draw.rect(self.screen, (255, 255, 255), rect, 2)
+            label = "Save and Quit" if key == "save" else "Quit"
+            surf = self.small_font.render(label, True, self.TEXT_COLOR)
+            surf_rect = surf.get_rect(center=rect.center)
+            self.screen.blit(surf, surf_rect)
     
     def _draw_info_panel(self):
         """Draw the top information panel (current player, selection, last move)."""
@@ -256,6 +281,20 @@ class ChessGameUI:
     
     def _handle_mouse_click(self, mouse_pos: Tuple[int, int]):
         """Handle mouse click events."""
+        # If a quit dialog is shown, handle its buttons separately
+        if self.show_quit_dialog:
+            # Save and Quit button
+            if self.quit_dialog_buttons["save"].collidepoint(mouse_pos):
+                self._save_game_and_return_to_menu()
+                return
+            # Quit without saving
+            elif self.quit_dialog_buttons["quit"].collidepoint(mouse_pos):
+                self._discard_save_and_return_to_menu()
+                return
+            # Click elsewhere cancels the dialog
+            self.show_quit_dialog = False
+            return
+        
         # First check if the user clicked on a button (bottom panel)
         if self.reset_button_rect.collidepoint(mouse_pos):
             # Reset game button
@@ -277,7 +316,7 @@ class ChessGameUI:
             return
         elif self.quit_button_rect.collidepoint(mouse_pos):
             # Quit button: return to menu
-            pygame.event.post(pygame.event.Event(pygame.QUIT))
+            self.show_quit_dialog = True
             return
 
         # Otherwise handle a click on the board
@@ -349,6 +388,25 @@ class ChessGameUI:
         # Keyboard controls are no longer needed; players use on‑screen buttons.
         if key == pygame.K_ESCAPE:
             return "menu"
+        
+    def _save_game_and_return_to_menu(self):
+        """Serialize the current game and exit to the menu."""
+        import json, os
+        data = self.game.to_dict()
+        # File is placed in the project root; adjust path as needed
+        with open("saved_game.json", "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        # Signal the run loop to exit and go back to the menu
+        self.game_over = True  # or set a custom flag
+
+    def _discard_save_and_return_to_menu(self):
+        """Delete any existing save and exit to the menu."""
+        import os
+        try:
+            os.remove("saved_game.json")
+        except FileNotFoundError:
+            pass
+        self.game_over = True
     
     def run(self):
         """Main game loop."""
