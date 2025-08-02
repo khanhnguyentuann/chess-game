@@ -18,6 +18,8 @@ from ...domain.entities.board import Board
 from ...domain.entities.game import Game
 from ...shared.types.enums import GameResult, GameState, Player
 from ...shared.utils.save_manager import save_manager
+from .animations import animation_system, animate, EasingType
+from .themes import theme_manager
 
 
 class MenuState(Enum):
@@ -48,21 +50,12 @@ class MenuSystem:
         if not pygame.get_init():
             pygame.init()
 
+        # Get current theme
+        self.theme = theme_manager.get_current_theme()
+
         # Window settings
         self.WINDOW_WIDTH = 800
         self.WINDOW_HEIGHT = 600
-
-        # Colors
-        self.WHITE = (255, 255, 255)
-        self.BLACK = (0, 0, 0)
-        self.GRAY = (128, 128, 128)
-        self.DARK_GRAY = (64, 64, 64)
-        self.BLUE = (0, 100, 200)
-        self.LIGHT_BLUE = (100, 150, 255)
-        self.RED = (200, 50, 50)
-        self.GREEN = (50, 200, 50)
-        self.BACKGROUND = (30, 30, 30)
-        self.MENU_BG = (50, 50, 50)
 
         # Setup display
         self.screen = pygame.display.set_mode((self.WINDOW_WIDTH, self.WINDOW_HEIGHT))
@@ -74,10 +67,16 @@ class MenuSystem:
         self.title_font = pygame.font.Font(None, 72)
         self.menu_font = pygame.font.Font(None, 48)
         self.help_font = pygame.font.Font(None, 24)
+        self.small_font = pygame.font.Font(None, 20)
 
         # Menu state
         self.current_state = MenuState.MAIN_MENU
         self.selected_item = 0
+        
+        # Animation properties
+        self.title_animation = 0.0
+        self.menu_item_animations = [0.0] * 10  # Support up to 10 menu items
+        self.menu_animation_objects = []  # Store animation objects for menu items
 
         # Game state
         self.game = None
@@ -85,6 +84,30 @@ class MenuSystem:
 
         # Load saved games
         self._load_saved_games()
+        
+        # Start entrance animations
+        self._start_entrance_animations()
+    
+    def _start_entrance_animations(self) -> None:
+        """Start entrance animations for menu elements."""
+        # Animate title
+        animate(self, 'title_animation', 1.0, 1.0, easing=EasingType.EASE_OUT, delay=0.2)
+        
+        # Animate menu items - create individual animation objects
+        self.menu_animation_objects = []
+        for i in range(len(self.menu_item_animations)):
+            # Create a simple object with a property for each animation
+            class MenuItemAnimation:
+                def __init__(self, value=0.0):
+                    self.value = value
+            
+            # Create animation object and animate it
+            anim_obj = MenuItemAnimation(0.0)
+            animate(anim_obj, 'value', 1.0, 0.8, 
+                   easing=EasingType.EASE_OUT, delay=0.5 + i * 0.1)
+            
+            # Store the animation object
+            self.menu_animation_objects.append(anim_obj)
 
     def _load_saved_games(self):
         """Load saved games from storage."""
@@ -149,20 +172,59 @@ class MenuSystem:
 
     def _draw_title(self):
         """Draw the game title."""
-        title_surface = self.title_font.render("CHESS GAME", True, self.WHITE)
+        # Apply animation transform
+        scale = 0.5 + 0.5 * self.title_animation
+        alpha = int(255 * self.title_animation)
+        
+        title_surface = self.title_font.render("CHESS GAME", True, self.theme.get_color('on_background'))
+        
+        # Scale the surface
+        if scale != 1.0:
+            original_size = title_surface.get_size()
+            new_size = (int(original_size[0] * scale), int(original_size[1] * scale))
+            title_surface = pygame.transform.scale(title_surface, new_size)
+        
+        title_surface.set_alpha(alpha)
         title_rect = title_surface.get_rect(center=(self.WINDOW_WIDTH // 2, 100))
         self.screen.blit(title_surface, title_rect)
+        
+        # Draw subtitle with animation
+        if self.title_animation > 0.7:
+            subtitle_alpha = int(255 * (self.title_animation - 0.7) / 0.3)
+            subtitle_surface = self.small_font.render("Clean Architecture Edition", True, self.theme.get_color('on_background'))
+            subtitle_surface.set_alpha(subtitle_alpha)
+            subtitle_rect = subtitle_surface.get_rect(center=(self.WINDOW_WIDTH // 2, 140))
+            self.screen.blit(subtitle_surface, subtitle_rect)
 
     def _draw_menu_items(self, items: List[MenuItem], start_y: int = 200):
         """Draw menu items."""
         for i, item in enumerate(items):
-            color = self.WHITE if item.enabled else self.GRAY
+            # Get animation progress from animation objects
+            animation_progress = 0.0
+            if i < len(self.menu_animation_objects):
+                animation_progress = self.menu_animation_objects[i].value
+            
+            # Calculate colors based on state and animation
+            base_color = self.theme.get_color('on_background') if item.enabled else self.theme.get_color('on_background', (128, 128, 128))
+            
             if i == self.selected_item and item.enabled:
-                color = self.LIGHT_BLUE
+                color = self.theme.get_color('primary')
+                # Draw selection background
+                bg_rect = pygame.Rect(self.WINDOW_WIDTH // 2 - 150, start_y + i * 60 - 10, 300, 50)
+                bg_surface = pygame.Surface((300, 50), pygame.SRCALPHA)
+                bg_surface.fill((*self.theme.get_color('primary'), 30))
+                self.screen.blit(bg_surface, bg_rect.topleft)
+            else:
+                color = base_color
+            
+            # Apply animation
+            alpha = int(255 * animation_progress)
+            x_offset = int(50 * (1 - animation_progress))
 
             text_surface = self.menu_font.render(item.text, True, color)
+            text_surface.set_alpha(alpha)
             text_rect = text_surface.get_rect(
-                center=(self.WINDOW_WIDTH // 2, start_y + i * 60)
+                center=(self.WINDOW_WIDTH // 2 + x_offset, start_y + i * 60)
             )
 
             # Store rect for click detection
@@ -182,13 +244,13 @@ class MenuSystem:
 
             if line == "CHESS GAME HELP":
                 font = self.menu_font
-                color = self.BLUE
+                color = self.theme.get_color('primary')
             elif line in ["HOW TO PLAY:", "GAME CONTROLS:", "GAME RULES:"]:
                 font = self.menu_font
-                color = self.GREEN
+                color = self.theme.get_color('success')
             else:
                 font = self.help_font
-                color = self.WHITE
+                color = self.theme.get_color('on_background')
 
             text_surface = font.render(line, True, color)
             text_rect = text_surface.get_rect(center=(self.WINDOW_WIDTH // 2, y_offset))
@@ -198,7 +260,10 @@ class MenuSystem:
     def _draw_main_menu(self):
         """Draw main menu."""
         # Draw background
-        self.screen.fill(self.BACKGROUND)
+        self.screen.fill(self.theme.get_color('background'))
+        
+        # Draw gradient overlay
+        self._draw_gradient_background()
 
         # Draw title
         self._draw_title()
@@ -209,16 +274,37 @@ class MenuSystem:
 
         # Draw version info
         version_text = "v1.0 - Clean Architecture"
-        version_surface = self.help_font.render(version_text, True, self.GRAY)
+        version_surface = self.help_font.render(version_text, True, self.theme.get_color('on_background', (128, 128, 128)))
         version_rect = version_surface.get_rect(
             center=(self.WINDOW_WIDTH // 2, self.WINDOW_HEIGHT - 30)
         )
         self.screen.blit(version_surface, version_rect)
+    
+    def _draw_gradient_background(self) -> None:
+        """Draw gradient background."""
+        # Create a subtle gradient from top to bottom
+        start_color = self.theme.get_color('background')
+        end_color = self.theme.get_color('surface')
+        
+        for y in range(self.WINDOW_HEIGHT):
+            t = y / self.WINDOW_HEIGHT
+            color = self._interpolate_color(start_color, end_color, t)
+            pygame.draw.line(self.screen, color, (0, y), (self.WINDOW_WIDTH, y))
+    
+    def _interpolate_color(self, color1: Tuple[int, int, int], color2: Tuple[int, int, int], t: float) -> Tuple[int, int, int]:
+        """Interpolate between two colors."""
+        t = max(0.0, min(1.0, t))
+        return (
+            int(color1[0] + (color2[0] - color1[0]) * t),
+            int(color1[1] + (color2[1] - color1[1]) * t),
+            int(color1[2] + (color2[2] - color1[2]) * t),
+        )
 
     def _draw_help_menu(self):
         """Draw help menu."""
         # Draw background
-        self.screen.fill(self.BACKGROUND)
+        self.screen.fill(self.theme.get_color('background'))
+        self._draw_gradient_background()
 
         # Draw help content
         self._draw_help_screen()
@@ -263,10 +349,10 @@ class MenuSystem:
         # Switch to game state
         self.current_state = MenuState.GAME_PLAYING
 
-        # Import and start game UI
-        from .chess_game_ui import ChessGameUI
+        # Import and start modern game UI
+        from .modern_chess_ui import ModernChessUI
 
-        game_ui = ChessGameUI()
+        game_ui = ModernChessUI()
         game_ui.game = self.game
         result = game_ui.run()
 
@@ -276,6 +362,9 @@ class MenuSystem:
 
         # Return to menu when game ends
         self.current_state = MenuState.MAIN_MENU
+        
+        # Restart entrance animations
+        self._start_entrance_animations()
 
     def _continue_game(self):
         """Continue a saved game."""
@@ -295,9 +384,9 @@ class MenuSystem:
         # Start the UI with the loaded game
         self.game = game
         self.current_state = MenuState.GAME_PLAYING
-        from .chess_game_ui import ChessGameUI
+        from .modern_chess_ui import ModernChessUI
 
-        game_ui = ChessGameUI()
+        game_ui = ModernChessUI()
         game_ui.game = self.game
         result = game_ui.run()
 
@@ -308,6 +397,9 @@ class MenuSystem:
         # After returning from UI, reload saved games list (it might have been removed)
         self._load_saved_games()
         self.current_state = MenuState.MAIN_MENU
+        
+        # Restart entrance animations
+        self._start_entrance_animations()
 
     def _handle_mouse_click(self, pos: Tuple[int, int]):
         """Handle mouse clicks on menu items."""
@@ -318,12 +410,18 @@ class MenuSystem:
                     self.selected_item = i
                     self._execute_menu_action(item.action)
                     break
+    
+    def update(self, dt: float) -> None:
+        """Update menu state and animations."""
+        animation_system.update(dt)
 
     def run(self):
         """Main menu loop."""
         running = True
 
         while running:
+            dt = self.clock.tick(60) / 1000.0  # Delta time in seconds
+            
             # Handle events
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -341,6 +439,9 @@ class MenuSystem:
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 1:  # Left click
                         self._handle_mouse_click(event.pos)
+            
+            # Update
+            self.update(dt)
 
             # Draw current state
             if self.current_state == MenuState.MAIN_MENU:
@@ -350,7 +451,6 @@ class MenuSystem:
 
             # Update display
             pygame.display.flip()
-            self.clock.tick(60)
 
         # Cleanup
         pygame.quit()

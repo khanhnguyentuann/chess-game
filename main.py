@@ -37,6 +37,13 @@ def main():
     finally:
         # Cleanup
         reset_container()
+        # Cleanup pygame
+        try:
+            import pygame
+            if pygame.get_init():
+                pygame.quit()
+        except ImportError:
+            pass
         print("Game shutdown complete")
 
 
