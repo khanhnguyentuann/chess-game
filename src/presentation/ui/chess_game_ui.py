@@ -3,18 +3,20 @@ Chess Game UI - Pygame-based user interface
 Provides a graphical interface for playing chess.
 """
 
-import pygame
-import sys
 import os
-from typing import Optional, Tuple, List
+import sys
 from pathlib import Path
+from typing import List, Optional, Tuple
+
+import pygame
+
+from ...composition_root import get_container, reset_container
+from ...domain.entities.board import Board
 
 # Import domain entities
 from ...domain.entities.game import Game
-from ...domain.entities.board import Board
-from ...shared.types.enums import Player, GameState, GameResult
+from ...shared.types.enums import GameResult, GameState, Player
 from ...shared.types.type_definitions import MoveRequest
-from ...composition_root import get_container, reset_container
 from ...shared.utils.save_manager import save_manager
 from .piece_renderer import PieceRenderer
 
@@ -149,7 +151,6 @@ class ChessGameUI:
             self.BOARD_OFFSET_X <= x <= self.BOARD_OFFSET_X + self.BOARD_SIZE
             and self.BOARD_OFFSET_Y <= y <= self.BOARD_OFFSET_Y + self.BOARD_SIZE
         ):
-
             # Convert to board coordinates
             board_x = (x - self.BOARD_OFFSET_X) // self.SQUARE_SIZE
             board_y = (y - self.BOARD_OFFSET_Y) // self.SQUARE_SIZE
@@ -441,13 +442,13 @@ class ChessGameUI:
     def _save_game_and_return_to_menu(self):
         """Serialize the current game and exit to the menu."""
         data = self.game.to_dict()
-        
+
         # Use save manager to save the game
         if save_manager.save_game(data):
             self._show_message("Game saved successfully!")
         else:
             self._show_message("Failed to save game!")
-        
+
         # Signal the run loop to exit and go back to the menu
         self.game_over = True
         return "menu"  # Return signal to go back to menu

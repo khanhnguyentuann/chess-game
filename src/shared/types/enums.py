@@ -9,6 +9,7 @@ from typing import Tuple
 
 class GameState(Enum):
     """Game state enumeration."""
+
     MENU = "menu"
     PLAYING = "playing"
     PAUSED = "paused"
@@ -20,24 +21,26 @@ class GameState(Enum):
 
 class Player(Enum):
     """Player colors."""
+
     WHITE = "white"
     BLACK = "black"
-    
+
     @property
     def chess_value(self) -> bool:
         """Get boolean value for python-chess compatibility."""
         return self == Player.WHITE
-    
+
     @property
     def name(self) -> str:
         return "White" if self == Player.WHITE else "Black"
-    
-    def opposite(self) -> 'Player':
+
+    def opposite(self) -> "Player":
         return Player.BLACK if self == Player.WHITE else Player.WHITE
 
 
 class PieceType(IntEnum):
     """Chess piece types matching python-chess constants."""
+
     PAWN = 1
     KNIGHT = 2
     BISHOP = 3
@@ -48,6 +51,7 @@ class PieceType(IntEnum):
 
 class GameResult(Enum):
     """Game result types."""
+
     WHITE_WINS = "white_wins"
     BLACK_WINS = "black_wins"
     DRAW_STALEMATE = "draw_stalemate"
@@ -59,6 +63,7 @@ class GameResult(Enum):
 
 class UIColors:
     """UI Color constants - MIGRATED FROM config.py"""
+
     WHITE = (255, 255, 255)
     BLACK = (0, 0, 0)
     GREEN = (0, 255, 0)
@@ -72,6 +77,7 @@ class UIColors:
 
 class UIConstants:
     """UI Constants - MIGRATED FROM config.py"""
+
     FPS = 30
     WINDOW_WIDTH = 512
     WINDOW_HEIGHT = 600
@@ -82,6 +88,7 @@ class UIConstants:
 
 class InputAction(Enum):
     """User input actions."""
+
     SELECT_SQUARE = "select_square"
     MAKE_MOVE = "make_move"
     UNDO_MOVE = "undo_move"
@@ -92,56 +99,57 @@ class InputAction(Enum):
 
 class Square:
     """Chess square representation."""
+
     def __init__(self, index: int):
         if not 0 <= index <= 63:
             raise ValueError(f"Invalid square index: {index}")
         self.index = index
-    
+
     @property
     def rank(self) -> int:
         """Get rank (row) 0-7."""
         return self.index // 8
-    
+
     @property
     def file(self) -> int:
         """Get file (column) 0-7."""
         return self.index % 8
-    
+
     @property
     def algebraic(self) -> str:
         """Get algebraic notation (e.g., 'e4')."""
-        files = 'abcdefgh'
-        ranks = '12345678'
+        files = "abcdefgh"
+        ranks = "12345678"
         return f"{files[self.file]}{ranks[self.rank]}"
-    
+
     @classmethod
-    def from_coords(cls, rank: int, file: int) -> 'Square':
+    def from_coords(cls, rank: int, file: int) -> "Square":
         """Create square from rank/file coordinates."""
         return cls(rank * 8 + file)
-    
+
     @classmethod
-    def from_algebraic(cls, notation: str) -> 'Square':
+    def from_algebraic(cls, notation: str) -> "Square":
         """Create square from algebraic notation."""
         if len(notation) != 2:
             raise ValueError(f"Invalid algebraic notation: {notation}")
-        
-        file = ord(notation[0].lower()) - ord('a')
+
+        file = ord(notation[0].lower()) - ord("a")
         rank = int(notation[1]) - 1
-        
+
         if not (0 <= file <= 7 and 0 <= rank <= 7):
             raise ValueError(f"Invalid algebraic notation: {notation}")
-        
+
         return cls.from_coords(rank, file)
-    
+
     def __eq__(self, other) -> bool:
         return isinstance(other, Square) and self.index == other.index
-    
+
     def __hash__(self) -> int:
         return hash(self.index)
-    
+
     def __str__(self) -> str:
         return self.algebraic
-    
+
     def __repr__(self) -> str:
         return f"Square({self.algebraic})"
 

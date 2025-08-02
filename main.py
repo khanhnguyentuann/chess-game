@@ -5,13 +5,13 @@ Clean Architecture chess game with dependency injection and event-driven design.
 Entry point that configures dependencies and starts the application.
 """
 
-import sys
 import logging
 import os
+import sys
 from pathlib import Path
 
 # Set pygame window to center on screen before any pygame initialization
-os.environ['SDL_VIDEO_CENTERED'] = '1'
+os.environ["SDL_VIDEO_CENTERED"] = "1"
 
 # Import composition root
 from src.composition_root import get_container, reset_container
@@ -24,9 +24,10 @@ def main():
     try:
         # Import and run the menu system directly
         from src.presentation.ui.menu_system import MenuSystem
+
         menu = MenuSystem()
         menu.run()
-        
+
     except KeyboardInterrupt:
         print("\nGame interrupted by user")
     except Exception as e:
