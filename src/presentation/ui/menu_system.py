@@ -5,6 +5,8 @@ Provides menu interface with game options.
 
 import os
 import sys
+import math
+import random
 from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -34,10 +36,11 @@ class MenuState(Enum):
 class MenuItem:
     """Represents a menu item."""
 
-    def __init__(self, text: str, action: str, enabled: bool = True):
+    def __init__(self, text: str, action: str, enabled: bool = True, icon: str = ""):
         self.text = text
         self.action = action
         self.enabled = enabled
+        self.icon = icon
         self.rect = None  # Will be set when drawing
 
 
@@ -54,8 +57,8 @@ class MenuSystem:
         self.theme = theme_manager.get_current_theme()
 
         # Window settings
-        self.WINDOW_WIDTH = 800
-        self.WINDOW_HEIGHT = 600
+        self.WINDOW_WIDTH = 1000
+        self.WINDOW_HEIGHT = 700
 
         # Setup display
         self.screen = pygame.display.set_mode((self.WINDOW_WIDTH, self.WINDOW_HEIGHT))
@@ -63,11 +66,14 @@ class MenuSystem:
 
         self.clock = pygame.time.Clock()
 
-        # Fonts
-        self.title_font = pygame.font.Font(None, 72)
-        self.menu_font = pygame.font.Font(None, 48)
+        # Fonts - Improved typography hierarchy
+        self.title_font = pygame.font.Font(None, 84)  # Larger title
+        self.subtitle_font = pygame.font.Font(None, 32)  # New subtitle font
+        self.menu_font = pygame.font.Font(None, 36)  # Slightly smaller menu items
+        self.menu_font_bold = pygame.font.Font(None, 38)  # Bold for selected items
         self.help_font = pygame.font.Font(None, 24)
-        self.small_font = pygame.font.Font(None, 20)
+        self.small_font = pygame.font.Font(None, 18)
+        self.version_font = pygame.font.Font(None, 16)
 
         # Menu state
         self.current_state = MenuState.MAIN_MENU
@@ -77,6 +83,14 @@ class MenuSystem:
         self.title_animation = 0.0
         self.menu_item_animations = [0.0] * 10  # Support up to 10 menu items
         self.menu_animation_objects = []  # Store animation objects for menu items
+        
+        # Background animation properties
+        self.background_time = 0.0
+        self.chess_pieces_alpha = 0.0
+        
+        # Particle system for visual effects
+        self.particles = []
+        self.particle_timer = 0.0
 
         # Game state
         self.game = None
@@ -91,7 +105,10 @@ class MenuSystem:
     def _start_entrance_animations(self) -> None:
         """Start entrance animations for menu elements."""
         # Animate title
-        animate(self, 'title_animation', 1.0, 1.0, easing=EasingType.EASE_OUT, delay=0.2)
+        animate(self, 'title_animation', 1.0, 1.2, easing=EasingType.EASE_OUT, delay=0.2)
+        
+        # Animate background chess pieces
+        animate(self, 'chess_pieces_alpha', 0.3, 2.0, easing=EasingType.EASE_OUT, delay=0.5)
         
         # Animate menu items - create individual animation objects
         self.menu_animation_objects = []
@@ -104,7 +121,7 @@ class MenuSystem:
             # Create animation object and animate it
             anim_obj = MenuItemAnimation(0.0)
             animate(anim_obj, 'value', 1.0, 0.8, 
-                   easing=EasingType.EASE_OUT, delay=0.5 + i * 0.1)
+                   easing=EasingType.EASE_OUT, delay=0.8 + i * 0.15)
             
             # Store the animation object
             self.menu_animation_objects.append(anim_obj)
@@ -130,12 +147,12 @@ class MenuSystem:
             )
 
     def _get_main_menu_items(self) -> List[MenuItem]:
-        """Get main menu items."""
+        """Get main menu items with icons."""
         return [
-            MenuItem("New Game", "new_game"),
-            MenuItem("Continue Game", "continue_game", bool(self.saved_games)),
-            MenuItem("Help", "help"),
-            MenuItem("Quit", "quit"),
+            MenuItem("New Game", "new_game", True, ""),
+            MenuItem("Continue Game", "continue_game", bool(self.saved_games), ""),
+            MenuItem("Help", "help", True, ""),
+            MenuItem("Quit", "quit", True, ""),
         ]
 
     def _get_help_text(self) -> List[str]:
@@ -170,13 +187,93 @@ class MenuSystem:
             "Press ESC to return to main menu",
         ]
 
+    def _draw_chess_background(self) -> None:
+        """Draw animated chess-themed background elements."""
+        # Draw subtle chess board pattern
+        square_size = 60
+        alpha = int(20 * self.chess_pieces_alpha)
+        
+        for row in range(0, self.WINDOW_HEIGHT // square_size + 2):
+            for col in range(0, self.WINDOW_WIDTH // square_size + 2):
+                x = col * square_size + (self.background_time * 10) % square_size
+                y = row * square_size + (self.background_time * 5) % square_size
+                
+                if (row + col) % 2 == 0:
+                    color = (*self.theme.get_color('surface'), alpha)
+                    rect = pygame.Rect(x, y, square_size, square_size)
+                    surface = pygame.Surface((square_size, square_size), pygame.SRCALPHA)
+                    surface.fill(color)
+                    self.screen.blit(surface, rect)
+        
+        # Draw floating chess pieces
+        pieces = ["♔", "♕", "♖", "♗", "♘", "♙"]
+        for i in range(6):
+            piece = pieces[i]
+            x = 50 + i * 150 + math.sin(self.background_time + i) * 20
+            y = 100 + i * 80 + math.cos(self.background_time + i) * 15
+            
+            piece_alpha = int(15 * self.chess_pieces_alpha)
+            piece_surface = self.title_font.render(piece, True, (*self.theme.get_color('on_background'), piece_alpha))
+            self.screen.blit(piece_surface, (x, y))
+        
+        # Draw particles
+        self._draw_particles()
+    
+    def _create_particle(self, x: float, y: float) -> dict:
+        """Create a new particle."""
+        return {
+            'x': x,
+            'y': y,
+            'vx': (random.random() - 0.5) * 20,
+            'vy': (random.random() - 0.5) * 20,
+            'life': 1.0,
+            'max_life': 1.0,
+            'size': random.random() * 3 + 1
+        }
+    
+    def _update_particles(self, dt: float) -> None:
+        """Update particle system."""
+        # Add new particles
+        self.particle_timer += dt
+        if self.particle_timer > 0.1:  # Create particle every 0.1 seconds
+            self.particle_timer = 0.0
+            x = random.random() * self.WINDOW_WIDTH
+            y = random.random() * self.WINDOW_HEIGHT
+            self.particles.append(self._create_particle(x, y))
+        
+        # Update existing particles
+        for particle in self.particles[:]:
+            particle['x'] += particle['vx'] * dt
+            particle['y'] += particle['vy'] * dt
+            particle['life'] -= dt * 0.5
+            
+            # Remove dead particles
+            if particle['life'] <= 0:
+                self.particles.remove(particle)
+    
+    def _draw_particles(self) -> None:
+        """Draw particles."""
+        for particle in self.particles:
+            alpha = int(255 * (particle['life'] / particle['max_life']))
+            size = int(particle['size'])
+            
+            if size > 0:
+                color = (*self.theme.get_color('primary'), alpha)
+                pygame.draw.circle(
+                    self.screen, 
+                    color, 
+                    (int(particle['x']), int(particle['y'])), 
+                    size
+                )
+
     def _draw_title(self):
-        """Draw the game title."""
+        """Draw the game title with enhanced styling."""
         # Apply animation transform
-        scale = 0.5 + 0.5 * self.title_animation
+        scale = 0.8 + 0.4 * self.title_animation
         alpha = int(255 * self.title_animation)
         
-        title_surface = self.title_font.render("CHESS GAME", True, self.theme.get_color('on_background'))
+        # Main title
+        title_surface = self.title_font.render("CHESS", True, self.theme.get_color('primary'))
         
         # Scale the surface
         if scale != 1.0:
@@ -185,65 +282,114 @@ class MenuSystem:
             title_surface = pygame.transform.scale(title_surface, new_size)
         
         title_surface.set_alpha(alpha)
-        title_rect = title_surface.get_rect(center=(self.WINDOW_WIDTH // 2, 100))
+        title_rect = title_surface.get_rect(center=(self.WINDOW_WIDTH // 2, 120))
+        
+        # Add shadow effect
+        shadow_surface = self.title_font.render("CHESS", True, (0, 0, 0))
+        if scale != 1.0:
+            shadow_surface = pygame.transform.scale(shadow_surface, new_size)
+        shadow_surface.set_alpha(alpha // 3)
+        shadow_rect = shadow_surface.get_rect(center=(self.WINDOW_WIDTH // 2 + 3, 123))
+        self.screen.blit(shadow_surface, shadow_rect)
+        
         self.screen.blit(title_surface, title_rect)
         
-        # Draw subtitle with animation
-        if self.title_animation > 0.7:
-            subtitle_alpha = int(255 * (self.title_animation - 0.7) / 0.3)
-            subtitle_surface = self.small_font.render("Clean Architecture Edition", True, self.theme.get_color('on_background'))
+        # Subtitle with animation
+        if self.title_animation > 0.6:
+            subtitle_alpha = int(255 * (self.title_animation - 0.6) / 0.4)
+            subtitle_surface = self.subtitle_font.render("Strategic Battle of Minds", True, self.theme.get_color('on_background'))
             subtitle_surface.set_alpha(subtitle_alpha)
-            subtitle_rect = subtitle_surface.get_rect(center=(self.WINDOW_WIDTH // 2, 140))
+            subtitle_rect = subtitle_surface.get_rect(center=(self.WINDOW_WIDTH // 2, 180))
             self.screen.blit(subtitle_surface, subtitle_rect)
 
-    def _draw_menu_items(self, items: List[MenuItem], start_y: int = 200):
-        """Draw menu items."""
+    def _draw_menu_items(self, items: List[MenuItem], start_y: int = 280):
+        """Draw menu items with enhanced styling."""
         for i, item in enumerate(items):
             # Get animation progress from animation objects
             animation_progress = 0.0
             if i < len(self.menu_animation_objects):
                 animation_progress = self.menu_animation_objects[i].value
             
-            # Calculate colors based on state and animation
-            base_color = self.theme.get_color('on_background') if item.enabled else self.theme.get_color('on_background', (128, 128, 128))
+            # Calculate colors and styling based on state
+            is_selected = i == self.selected_item and item.enabled
+            is_enabled = item.enabled
             
-            if i == self.selected_item and item.enabled:
-                color = self.theme.get_color('primary')
-                # Draw selection background
-                bg_rect = pygame.Rect(self.WINDOW_WIDTH // 2 - 150, start_y + i * 60 - 10, 300, 50)
-                bg_surface = pygame.Surface((300, 50), pygame.SRCALPHA)
-                bg_surface.fill((*self.theme.get_color('primary'), 30))
+            # Background styling
+            item_width = 400
+            item_height = 60
+            item_x = (self.WINDOW_WIDTH - item_width) // 2
+            item_y = start_y + i * 80
+            
+            # Draw background
+            if is_selected:
+                # Selected item background with gradient
+                bg_rect = pygame.Rect(item_x - 10, item_y - 5, item_width + 20, item_height + 10)
+                bg_surface = pygame.Surface((item_width + 20, item_height + 10), pygame.SRCALPHA)
+                
+                # Gradient background
+                for y in range(item_height + 10):
+                    t = y / (item_height + 10)
+                    color = self._interpolate_color(
+                        self.theme.get_color('primary'),
+                        self.theme.get_color('surface'),
+                        t
+                    )
+                    pygame.draw.line(bg_surface, (*color, 180), (0, y), (item_width + 20, y))
+                
                 self.screen.blit(bg_surface, bg_rect.topleft)
+                
+                # Border
+                pygame.draw.rect(self.screen, self.theme.get_color('primary'), bg_rect, 2)
+            
+            # Text styling
+            if is_selected:
+                font = self.menu_font_bold
+                color = self.theme.get_color('on_primary', (255, 255, 255))
+            elif is_enabled:
+                font = self.menu_font
+                color = self.theme.get_color('on_background')
             else:
-                color = base_color
+                font = self.menu_font
+                color = self.theme.get_color('on_background', (128, 128, 128))
             
             # Apply animation
             alpha = int(255 * animation_progress)
-            x_offset = int(50 * (1 - animation_progress))
-
-            text_surface = self.menu_font.render(item.text, True, color)
+            x_offset = int(80 * (1 - animation_progress))
+            
+            # Render text (centered)
+            text_surface = font.render(item.text, True, color)
             text_surface.set_alpha(alpha)
             text_rect = text_surface.get_rect(
-                center=(self.WINDOW_WIDTH // 2 + x_offset, start_y + i * 60)
+                center=(self.WINDOW_WIDTH // 2 + x_offset, item_y + item_height // 2)
             )
-
-            # Store rect for click detection
-            item.rect = text_rect
-
+            
+            # Store rect for click detection (larger click area)
+            item.rect = pygame.Rect(item_x - 10, item_y - 5, item_width + 20, item_height + 10)
+            
             self.screen.blit(text_surface, text_rect)
+            
+            # Add subtle hover effect for enabled items
+            if is_enabled and not is_selected:
+                # Subtle glow effect for text
+                glow_surface = font.render(item.text, True, (*self.theme.get_color('primary'), 30))
+                glow_surface.set_alpha(alpha // 4)
+                glow_rect = glow_surface.get_rect(
+                    center=(self.WINDOW_WIDTH // 2 + x_offset + 1, item_y + item_height // 2 + 1)
+                )
+                self.screen.blit(glow_surface, glow_rect)
 
     def _draw_help_screen(self):
-        """Draw help screen."""
+        """Draw help screen with improved styling."""
         help_text = self._get_help_text()
 
-        y_offset = 50
+        y_offset = 80
         for line in help_text:
             if line == "":
-                y_offset += 20
+                y_offset += 25
                 continue
 
             if line == "CHESS GAME HELP":
-                font = self.menu_font
+                font = self.title_font
                 color = self.theme.get_color('primary')
             elif line in ["HOW TO PLAY:", "GAME CONTROLS:", "GAME RULES:"]:
                 font = self.menu_font
@@ -255,12 +401,15 @@ class MenuSystem:
             text_surface = font.render(line, True, color)
             text_rect = text_surface.get_rect(center=(self.WINDOW_WIDTH // 2, y_offset))
             self.screen.blit(text_surface, text_rect)
-            y_offset += 30
+            y_offset += 35
 
     def _draw_main_menu(self):
-        """Draw main menu."""
+        """Draw main menu with enhanced design."""
         # Draw background
         self.screen.fill(self.theme.get_color('background'))
+        
+        # Draw animated chess background
+        self._draw_chess_background()
         
         # Draw gradient overlay
         self._draw_gradient_background()
@@ -272,13 +421,29 @@ class MenuSystem:
         menu_items = self._get_main_menu_items()
         self._draw_menu_items(menu_items)
 
-        # Draw version info
-        version_text = "v1.0 - Clean Architecture"
-        version_surface = self.help_font.render(version_text, True, self.theme.get_color('on_background', (128, 128, 128)))
+        # Draw version info with better styling
+        self._draw_version_info()
+    
+    def _draw_version_info(self):
+        """Draw version information with improved styling."""
+        version_text = "v1.0"
+        subtitle_text = "Clean Architecture Edition"
+        
+        # Version number
+        version_surface = self.version_font.render(version_text, True, self.theme.get_color('on_background', (100, 100, 100)))
         version_rect = version_surface.get_rect(
-            center=(self.WINDOW_WIDTH // 2, self.WINDOW_HEIGHT - 30)
+            center=(self.WINDOW_WIDTH // 2, self.WINDOW_HEIGHT - 50)
         )
         self.screen.blit(version_surface, version_rect)
+        
+        # Subtitle
+        subtitle_surface = self.small_font.render(subtitle_text, True, self.theme.get_color('on_background', (80, 80, 80)))
+        subtitle_rect = subtitle_surface.get_rect(
+            center=(self.WINDOW_WIDTH // 2, self.WINDOW_HEIGHT - 30)
+        )
+        self.screen.blit(subtitle_surface, subtitle_rect)
+    
+
     
     def _draw_gradient_background(self) -> None:
         """Draw gradient background."""
@@ -413,6 +578,13 @@ class MenuSystem:
     
     def update(self, dt: float) -> None:
         """Update menu state and animations."""
+        # Update background animation time
+        self.background_time += dt
+        
+        # Update particle system
+        self._update_particles(dt)
+        
+        # Update animation system
         animation_system.update(dt)
 
     def run(self):
