@@ -15,6 +15,7 @@ from ...domain.entities.game import Game
 from ...domain.entities.board import Board
 from ...shared.types.enums import Player, GameState, GameResult
 from ...composition_root import get_container, reset_container
+from ...shared.utils.save_manager import save_manager
 
 
 class MenuState(Enum):
@@ -63,6 +64,7 @@ class MenuSystem:
         # Setup display
         self.screen = pygame.display.set_mode((self.WINDOW_WIDTH, self.WINDOW_HEIGHT))
         pygame.display.set_caption("Chess Game - Menu")
+        
         self.clock = pygame.time.Clock()
         
         # Fonts
@@ -83,24 +85,21 @@ class MenuSystem:
     
     def _load_saved_games(self):
         """Load saved games from storage."""
-        # For now, just create some dummy saved games
-        # In a real implementation, this would load from file/database
-        self.saved_games = [
-            {"name": "Game 1", "date": "2024-01-15", "moves": 12},
-            {"name": "Game 2", "date": "2024-01-16", "moves": 8}
-        ]
-
-        import os, json
         self.saved_games = []
-        if os.path.exists("saved_game.json"):
-            # We only have a single save slot; read metadata for display
-            with open("saved_game.json", "r", encoding="utf-8") as f:
-                data = json.load(f)
-            # The saved data might include created_at or move_count
-            game_name = f"{data.get('id', 'Saved Game')}"
-            moves = data.get('move_count', 0)
-            # Append a dictionary with basic info; add date if desired
-            self.saved_games.append({"name": game_name, "moves": moves})
+        
+        # Use save manager to get save file info
+        save_info = save_manager.get_save_info()
+        if save_info:
+            game_name = f"Game {save_info['game_id'][:8]}"
+            moves = save_info['move_count']
+            modified_date = save_info['modified_at'][:10]  # Just the date part
+            
+            self.saved_games.append({
+                "name": game_name, 
+                "date": modified_date, 
+                "moves": moves,
+                "filename": save_info['filename']
+            })
     
     def _get_main_menu_items(self) -> List[MenuItem]:
         """Get main menu items."""
@@ -259,25 +258,29 @@ class MenuSystem:
         from .chess_game_ui import ChessGameUI
         game_ui = ChessGameUI()
         game_ui.game = self.game
-        game_ui.run()
+        result = game_ui.run()
+        
+        # Reset window size to menu size when returning
+        self.screen = pygame.display.set_mode((self.WINDOW_WIDTH, self.WINDOW_HEIGHT))
+        pygame.display.set_caption("Chess Game - Menu")
         
         # Return to menu when game ends
         self.current_state = MenuState.MAIN_MENU
     
     def _continue_game(self):
         """Continue a saved game."""
-        # Read the saved game file
-        import json, os
-        if not os.path.exists("saved_game.json"):
+        # Use save manager to load the game
+        data = save_manager.load_game()
+        if not data:
             # Fallback: start new game if no save is found
             self._start_new_game()
             return
-        with open("saved_game.json", "r", encoding="utf-8") as f:
-            data = json.load(f)
+        
         # Reconstruct the game
         from ...domain.entities.game import Game
         from ...shared.types.enums import Player
         game = Game.from_dict(data)
+        
         # Start the UI with the loaded game
         self.game = game
         self.current_state = MenuState.GAME_PLAYING
@@ -285,6 +288,11 @@ class MenuSystem:
         game_ui = ChessGameUI()
         game_ui.game = self.game
         result = game_ui.run()
+        
+        # Reset window size to menu size when returning
+        self.screen = pygame.display.set_mode((self.WINDOW_WIDTH, self.WINDOW_HEIGHT))
+        pygame.display.set_caption("Chess Game - Menu")
+        
         # After returning from UI, reload saved games list (it might have been removed)
         self._load_saved_games()
         self.current_state = MenuState.MAIN_MENU

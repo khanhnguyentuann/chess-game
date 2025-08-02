@@ -445,11 +445,10 @@ class Game:
         game._selected_square = data.get('selected_square')
         game._white_time_remaining = data.get('white_time')
         game._black_time_remaining = data.get('black_time')
-        game._current_player = Player.WHITE if game._board.internal_board.turn else Player.BLACK
         # Set current player from saved data (defaults to White)
         from ...shared.types.enums import Player
         cp_str = data.get('current_player', 'white')
-        game.current_player = Player(cp_str)
+        game._current_player = Player(cp_str)
 
         # Restore move history if needed (not strictly required when FEN is saved)
         # Here we simply record the history rather than re‑applying moves,
