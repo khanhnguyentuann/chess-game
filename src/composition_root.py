@@ -10,6 +10,12 @@ from typing import Any, Dict, Optional
 # Application layer
 from .application.commands.base_command import CommandExecutor
 from .application.use_cases.make_move import MakeMoveUseCase
+from .application.use_cases.get_legal_moves import GetLegalMovesUseCase
+from .application.use_cases.undo_move import UndoMoveUseCase
+from .application.use_cases.redo_move import RedoMoveUseCase
+from .application.validators.move_validator import MoveRequestValidator
+from .application.validators.game_validator import GameStateValidator
+from .application.services.game_application_service import GameApplicationService
 from .domain.events.event_dispatcher import EventDispatcher, get_event_dispatcher
 
 # Domain services
@@ -131,6 +137,17 @@ class ServiceContainer:
         # Command executor
         self._register_singleton("command_executor", CommandExecutor)
 
+        # Validators
+        self._register_singleton(
+            "move_request_validator",
+            lambda: MoveRequestValidator(self.get("move_validator")),
+        )
+        
+        self._register_singleton(
+            "game_state_validator",
+            lambda: GameStateValidator(),
+        )
+
         # Use cases
         self._register_singleton(
             "make_move_use_case",
@@ -141,6 +158,47 @@ class ServiceContainer:
                 notification_service=self.get("notification_service"),
                 command_executor=self.get("command_executor"),
                 move_analyzer=self.get("move_analyzer"),
+            ),
+        )
+        
+        self._register_singleton(
+            "get_legal_moves_use_case",
+            lambda: GetLegalMovesUseCase(
+                move_validator=self.get("move_validator"),
+            ),
+        )
+        
+        self._register_singleton(
+            "undo_move_use_case",
+            lambda: UndoMoveUseCase(
+                command_executor=self.get("command_executor"),
+                game_repository=self.get("game_repository"),
+                move_history_repository=self.get("move_history_repository"),
+                notification_service=self.get("notification_service"),
+            ),
+        )
+        
+        self._register_singleton(
+            "redo_move_use_case",
+            lambda: RedoMoveUseCase(
+                command_executor=self.get("command_executor"),
+                game_repository=self.get("game_repository"),
+                move_history_repository=self.get("move_history_repository"),
+                notification_service=self.get("notification_service"),
+            ),
+        )
+
+        # Application services
+        self._register_singleton(
+            "game_application_service",
+            lambda: GameApplicationService(
+                game_repository=self.get("game_repository"),
+                make_move_use_case=self.get("make_move_use_case"),
+                get_legal_moves_use_case=self.get("get_legal_moves_use_case"),
+                undo_move_use_case=self.get("undo_move_use_case"),
+                redo_move_use_case=self.get("redo_move_use_case"),
+                move_validator=self.get("move_request_validator"),
+                game_validator=self.get("game_state_validator"),
             ),
         )
 
@@ -292,3 +350,18 @@ def get_make_move_use_case() -> MakeMoveUseCase:
 def get_command_executor() -> CommandExecutor:
     """Get command executor."""
     return get_container().get("command_executor")
+
+
+def get_game_application_service() -> GameApplicationService:
+    """Get the game application service."""
+    return get_container().get("game_application_service")
+
+
+def get_move_request_validator() -> MoveRequestValidator:
+    """Get the move request validator."""
+    return get_container().get("move_request_validator")
+
+
+def get_game_state_validator() -> GameStateValidator:
+    """Get the game state validator."""
+    return get_container().get("game_state_validator")

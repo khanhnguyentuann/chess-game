@@ -11,7 +11,7 @@ from ...domain.entities.board import Board
 from ...domain.entities.game import Game
 from ...domain.interfaces.services import IMoveValidationService
 from ...shared.types.enums import Player
-from ...shared.types.type_definitions import MoveRequest
+from ..contracts.move_contracts import MoveRequest
 from .base_command import CommandResult, ICommand
 
 
