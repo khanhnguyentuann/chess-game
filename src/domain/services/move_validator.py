@@ -1,6 +1,6 @@
 """
 Move Validator Service
-MIGRATED FROM: models/chess_board.py (validation logic)
+Domain service for validating chess moves according to business rules.
 """
 
 from typing import List, Optional
@@ -8,9 +8,16 @@ from typing import List, Optional
 import chess
 
 from ...shared.types.enums import PieceType, Player
-from ...shared.types.type_definitions import InvalidMoveException, MoveRequest
 from ..entities.board import Board
 from ..entities.game import Game
+from ..exceptions.move_exceptions import (
+    IllegalMoveException,
+    InvalidSquareException,
+    NoPieceAtSquareException,
+    WrongPlayerException,
+)
+from ..value_objects.move import Move
+from ..value_objects.square import Square
 
 
 class MoveValidatorService:
@@ -19,13 +26,13 @@ class MoveValidatorService:
     Extracted from chess_board.py for better separation of concerns.
     """
 
-    def validate_move_request(self, game: Game, move_request: MoveRequest) -> bool:
+    def validate_move(self, game: Game, move: Move) -> bool:
         """
-        Validate a move request against game rules.
+        Validate a move against game rules.
 
         Args:
             game: Current game state
-            move_request: Move to validate
+            move: Move to validate
 
         Returns:
             True if move is valid
@@ -36,64 +43,60 @@ class MoveValidatorService:
         board = game.board
 
         # Basic validation
-        if not self._validate_squares(move_request.from_square, move_request.to_square):
-            raise InvalidMoveException("Invalid square coordinates")
+        if not self._validate_square(move.from_square.index):
+            raise InvalidSquareException(move.from_square.index)
+        
+        if not self._validate_square(move.to_square.index):
+            raise InvalidSquareException(move.to_square.index)
 
         # Check if there's a piece at from_square
-        piece = board.get_piece_at(move_request.from_square)
+        piece = board.get_piece_at(move.from_square.index)
         if piece is None:
-            raise InvalidMoveException("No piece at source square")
+            raise NoPieceAtSquareException(move.from_square.index)
 
         # Check if piece belongs to current player
         piece_color = Player.WHITE if piece.color else Player.BLACK
         if piece_color != game.current_player:
-            raise InvalidMoveException("Cannot move opponent's piece")
+            raise WrongPlayerException()
 
         # Create chess.Move object
-        move = chess.Move(
-            move_request.from_square, move_request.to_square, move_request.promotion
-        )
+        chess_move = move.to_chess_move()
 
         # Validate move is legal
-        if not board.is_move_legal(move):
-            raise InvalidMoveException("Move is not legal in current position")
+        if not board.is_move_legal(chess_move):
+            raise IllegalMoveException("Move is not legal in current position")
 
         # Special validation for pawn promotion
-        if self._is_pawn_promotion_move(board, move_request):
-            if move_request.promotion is None:
-                raise InvalidMoveException("Pawn promotion requires promotion piece")
-            if move_request.promotion not in [
-                chess.QUEEN,
-                chess.ROOK,
-                chess.BISHOP,
-                chess.KNIGHT,
-            ]:
-                raise InvalidMoveException("Invalid promotion piece")
+        if self._is_pawn_promotion_move(board, move):
+            if move.promotion is None:
+                raise IllegalMoveException("Pawn promotion requires promotion piece")
+            if move.promotion not in [PieceType.QUEEN, PieceType.ROOK, PieceType.BISHOP, PieceType.KNIGHT]:
+                raise IllegalMoveException("Invalid promotion piece")
 
         return True
 
-    def get_legal_moves_for_square(self, board: Board, square: int) -> List[chess.Move]:
+    def get_legal_moves_for_square(self, board: Board, square: Square) -> List[chess.Move]:
         """
         Get all legal moves for a piece at given square.
 
         Args:
             board: Board state
-            square: Square index
+            square: Square to check
 
         Returns:
             List of legal moves from that square
         """
-        if not self._validate_square(square):
+        if not self._validate_square(square.index):
             return []
 
-        return board.get_legal_moves_from_square(square)
+        return board.get_legal_moves_from_square(square.index)
 
     def get_all_legal_moves(self, board: Board) -> List[chess.Move]:
         """Get all legal moves in current position."""
         return board.get_legal_moves()
 
     def is_square_attackable(
-        self, board: Board, square: int, by_player: Player
+        self, board: Board, square: Square, by_player: Player
     ) -> bool:
         """
         Check if a square is attackable by a player.
@@ -106,7 +109,7 @@ class MoveValidatorService:
         Returns:
             True if square can be attacked by player
         """
-        if not self._validate_square(square):
+        if not self._validate_square(square.index):
             return False
 
         # Get all legal moves for the player
@@ -118,9 +121,9 @@ class MoveValidatorService:
         ]
 
         # Check if any move attacks the target square
-        return any(move.to_square == square for move in player_moves)
+        return any(move.to_square == square.index for move in player_moves)
 
-    def is_square_defended(self, board: Board, square: int) -> bool:
+    def is_square_defended(self, board: Board, square: Square) -> bool:
         """
         Check if a square is defended by the piece's own side.
 
@@ -131,14 +134,14 @@ class MoveValidatorService:
         Returns:
             True if square is defended
         """
-        piece = board.get_piece_at(square)
+        piece = board.get_piece_at(square.index)
         if piece is None:
             return False
 
         piece_player = Player.WHITE if piece.color else Player.BLACK
         return self.is_square_attackable(board, square, piece_player)
 
-    def get_attacking_pieces(self, board: Board, square: int) -> List[int]:
+    def get_attacking_pieces(self, board: Board, square: Square) -> List[int]:
         """
         Get all pieces attacking a square.
 
@@ -153,7 +156,7 @@ class MoveValidatorService:
         all_moves = board.get_legal_moves()
 
         for move in all_moves:
-            if move.to_square == square:
+            if move.to_square == square.index:
                 attackers.append(move.from_square)
 
         return attackers
@@ -242,13 +245,13 @@ class MoveValidatorService:
         """Validate both squares."""
         return self._validate_square(from_square) and self._validate_square(to_square)
 
-    def _is_pawn_promotion_move(self, board: Board, move_request: MoveRequest) -> bool:
+    def _is_pawn_promotion_move(self, board: Board, move: Move) -> bool:
         """Check if move is pawn promotion."""
-        piece = board.get_piece_at(move_request.from_square)
+        piece = board.get_piece_at(move.from_square.index)
         if piece is None or piece.piece_type != chess.PAWN:
             return False
 
-        to_rank = move_request.to_square // 8
+        to_rank = move.to_square.rank
         return (piece.color and to_rank == 7) or (not piece.color and to_rank == 0)
 
     def _move_belongs_to_player(
