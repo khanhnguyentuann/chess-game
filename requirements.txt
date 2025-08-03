@@ -1,9 +1,6 @@
 # Chess Game Requirements
-# Production-grade dependencies with pinned versions
-
 # Core dependencies
 pygame==2.5.2
-python-chess==1.999
 
 # Configuration management
 PyYAML==6.0.1
@@ -14,12 +11,12 @@ pydantic==2.5.0
 # Async support
 aiofiles==23.2.0
 
-# Testing dependencies
+# Testing dependencies (optional)
 pytest==7.4.3
 pytest-asyncio==0.23.2
 pytest-mock==3.12.0
 
-# Development dependencies
+# Development dependencies (optional)
 black==23.12.0
 flake8==6.1.0
 mypy==1.8.0

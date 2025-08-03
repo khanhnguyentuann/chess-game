@@ -6,25 +6,30 @@ Entry point that configures dependencies and starts the application.
 """
 
 import logging
-import os
 import sys
-from pathlib import Path
 
-# Set pygame window to center on screen before any pygame initialization
-os.environ["SDL_VIDEO_CENTERED"] = "1"
-
-# Import composition root
-from src.composition_root import get_container, reset_container
+# Import application manager
+from src.application_manager import get_application_manager, shutdown_application_manager
 
 
 def main():
     """
     Main function that initializes the application and starts the game.
     """
+    app_manager = None
     try:
-        # Import and run the menu system directly
+        # Initialize application manager
+        app_manager = get_application_manager()
+        
+        # Get application context
+        app_context = app_manager.get_context()
+        
+        # Create presentation layer components
+        game_controller = app_context.create_game_controller()
+        game_view_model = app_context.create_game_view_model()
+        
+        # Initialize and run the menu system
         from src.presentation.ui.menu_system import MenuSystem
-
         menu = MenuSystem()
         menu.run()
 
@@ -36,7 +41,8 @@ def main():
         sys.exit(1)
     finally:
         # Cleanup
-        reset_container()
+        if app_manager:
+            shutdown_application_manager()
         # Cleanup pygame
         try:
             import pygame

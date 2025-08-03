@@ -49,8 +49,8 @@ class BoardSquareViewModel:
 @dataclass
 class GameStateViewModel:
     """View model for game state."""
-    game_id: str
-    current_player: str
+    game_id: str = ""
+    current_player: str = "white"
     board_squares: List[BoardSquareViewModel] = field(default_factory=list)
     selected_square: Optional[int] = None
     legal_moves: List[int] = field(default_factory=list)

@@ -73,6 +73,9 @@ class ServiceContainer:
         # Register infrastructure services
         self._register_infrastructure_services()
 
+        # Register presentation components
+        self._register_presentation_components()
+
         # Setup event handlers
         self._setup_event_handlers()
 
@@ -205,10 +208,15 @@ class ServiceContainer:
     def _register_infrastructure_services(self) -> None:
         """Register infrastructure services."""
 
+        # Notification service
+        self._register_singleton(
+            "notification_service",
+            DummyNotificationService
+        )
+
         # UI services will be registered here
         # AI engine services will be registered here
         # External API services will be registered here
-        pass
 
     def _setup_event_handlers(self) -> None:
         """Setup event handlers and subscribers."""
@@ -225,6 +233,15 @@ class ServiceContainer:
         # - UI updates
 
         self.logger.info("Event handlers configured")
+
+    def _register_presentation_components(self) -> None:
+        """Register presentation layer components."""
+        
+        # Note: Presentation components are typically created per-request
+        # and not registered as singletons. They are created when needed
+        # in the main function or request handlers.
+        
+        self.logger.info("Presentation components ready for instantiation")
 
     def _register_singleton(self, name: str, factory) -> None:
         """Register a singleton service."""

@@ -14,7 +14,7 @@ from typing import Any, Dict, Optional
 class SaveManager:
     """Manages game save files with proper directory structure and error handling."""
 
-    def __init__(self, saves_dir: str = "saves"):
+    def __init__(self, saves_dir: str = "src/shared/data"):
         """
         Initialize the save manager.
 

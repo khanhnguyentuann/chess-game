@@ -169,6 +169,7 @@ saves/
 savegames/
 user_data/
 profiles/
+src/shared/data/*.json
 settings.json
 config.json
 
