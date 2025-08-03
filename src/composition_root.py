@@ -20,11 +20,11 @@ from .domain.events.event_dispatcher import EventDispatcher, get_event_dispatche
 
 # Domain services
 from .domain.services.move_validator import MoveAnalyzer, MoveValidatorService
-from .infrastructure.dummy_notification_service import DummyNotificationService
+from .infrastructure.services.notification_service import DummyNotificationService
 
 # Infrastructure
-from .infrastructure.repositories.memory_game_repo import MemoryGameRepository
-from .infrastructure.repositories.memory_move_history_repo import (
+from .infrastructure.persistence.memory_game_repository import MemoryGameRepository
+from .infrastructure.persistence.memory_move_history_repository import (
     MemoryMoveHistoryRepository,
 )
 

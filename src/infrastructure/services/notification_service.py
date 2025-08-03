@@ -4,9 +4,9 @@ Dummy Notification Service for testing
 
 from typing import Any, Dict
 
-from ..domain.entities.game import Game
-from ..domain.interfaces.services import INotificationService
-from ..shared.types.enums import GameResult, Player
+from ...domain.entities.game import Game
+from ...domain.interfaces.services import INotificationService
+from ...shared.types.enums import GameResult, Player
 
 
 class DummyNotificationService(INotificationService):
